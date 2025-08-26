@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 httpx
-aioredis
+redis>=4.2.0
 sqlalchemy
 psycopg2-binary
 alembic

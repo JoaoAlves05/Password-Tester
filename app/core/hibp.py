@@ -14,8 +14,8 @@ logger = logging.getLogger("hibp")
 
 async def fetch_hibp_range(prefix: str, retries: int = 3, backoff: float = 1.0) -> List[Dict[str, int]]:
     """
-    Faz request ao HIBP para um prefixo SHA-1 (5 hex chars).
-    Implementa retry/backoff em caso de 429.
+    Request HIBP for a SHA-1 prefix (5 hex chars).
+    Implements retry/backoff on 429.
     """
     url = HIBP_URL.format(prefix=prefix)
     headers = {"User-Agent": USER_AGENT}
@@ -25,7 +25,7 @@ async def fetch_hibp_range(prefix: str, retries: int = 3, backoff: float = 1.0) 
             if resp.status_code == 200:
                 return parse_hibp_response(resp.text)
             elif resp.status_code == 429:
-                logger.warning("HIBP rate limited, backoff %.1fs", backoff)
+                logger.warning("HIBP rate limited, backing off %.1fs", backoff)
                 await asyncio.sleep(backoff)
                 backoff *= 2
             else:
@@ -35,7 +35,7 @@ async def fetch_hibp_range(prefix: str, retries: int = 3, backoff: float = 1.0) 
 
 def parse_hibp_response(text: str) -> List[Dict[str, int]]:
     """
-    Parse resposta HIBP (suffix:count por linha).
+    Parse HIBP response (suffix:count per line).
     """
     results = []
     for line in text.splitlines():
@@ -46,19 +46,19 @@ def parse_hibp_response(text: str) -> List[Dict[str, int]]:
 
 async def get_pwned_from_cache(prefix: str) -> Tuple[List[Dict[str, int]], bool]:
     """
-    Tenta obter do Redis, senão faz fetch e cacheia.
+    Try to get from Redis, otherwise fetch and cache.
     """
     redis = await get_redis()
     cache_key = f"{CACHE_PREFIX}{prefix}"
     cached = await redis.get(cache_key)
     if cached:
-        # Limitar tamanho resposta para segurança
+        # Limit response size for security
         try:
             data = json.loads(cached)
             return data, True
         except Exception:
-            logger.warning("Erro ao ler cache HIBP")
-    # Miss: fetch e cachear
+            logger.warning("Error reading HIBP cache")
+    # Miss: fetch and cache
     data = await fetch_hibp_range(prefix)
     await redis.set(cache_key, json.dumps(data), ex=CACHE_TTL)
     return data, False

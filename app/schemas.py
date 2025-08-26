@@ -6,7 +6,7 @@ class PwnedSuffix(BaseModel):
     count: int
 
 class PwnedRequest(BaseModel):
-    prefix: str = Field(..., min_length=5, max_length=5, regex="^[0-9a-fA-F]{5}$")
+    prefix: str = Field(..., min_length=5, max_length=5, pattern="^[0-9a-fA-F]{5}$")
 
 class PwnedResponse(BaseModel):
     prefix: str
@@ -14,8 +14,8 @@ class PwnedResponse(BaseModel):
     cache_hit: bool
 
 class PwnedCheckRequest(BaseModel):
-    prefix: str = Field(..., min_length=5, max_length=5, regex="^[0-9a-fA-F]{5}$")
-    suffix: Optional[str] = Field(None, min_length=35, max_length=35, regex="^[0-9a-fA-F]{35}$")
+    prefix: str = Field(..., min_length=5, max_length=5, pattern="^[0-9a-fA-F]{5}$")
+    suffix: Optional[str] = Field(None, min_length=35, max_length=35, pattern="^[0-9a-fA-F]{35}$")
 
 class PwnedCheckResponse(BaseModel):
     pwned: Optional[bool] = None
