@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <title>Password Strength Tester Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
+</head>
+<body>
+<h2>Password Strength Tester Demo</h2>
+<input id="pw" type="password" placeholder="Type password">
+<button id="check">Check</button>
+<pre id="out"></pre>
+<script>
+async function sha1Hex(str) {
+  const enc = new TextEncoder();
+  const data = enc.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+document.getElementById('check').addEventListener('click', async () => {
+  const pw = document.getElementById('pw').value;
+  if (!pw) { document.getElementById('out').textContent = 'Type a password'; return; }
+  const h = await sha1Hex(pw);
+  const prefix = h.slice(0,5);
+  const suffix = h.slice(5);
+  // Pwned check
+  const res = await fetch('/api/v1/pwned-range', {
+    method:'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ prefix })
+  });
+  const data = await res.json();
+  const found = data.results.find(r => r.suffix === suffix);
+  // zxcvbn score
+  const z = zxcvbn(pw);
+  let msg = found ? `Pwned! Count: ${found.count}\n` : 'Not pwned\n';
+  msg += `Strength: ${z.score}/4 (${["Very weak","Weak","Good","Excellent","Excellent"][z.score]})\n`;
+  if (z.feedback.suggestions.length) msg += "Suggestions: " + z.feedback.suggestions.join("; ");
+  document.getElementById('out').textContent = msg;
+});
+</script>
+</body>
+</html>

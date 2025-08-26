@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+httpx
+aioredis
+sqlalchemy
+psycopg2-binary
+alembic
+zxcvbn-python
+slowapi
+pydantic
+python-dotenv
+pytest
+pytest-asyncio
+respx
+httpx-mock
+pytest-cov
+ruff
