@@ -12,6 +12,6 @@ python-dotenv
 pytest
 pytest-asyncio
 respx
-httpx-mock
 pytest-cov
+ruff
 ruff
