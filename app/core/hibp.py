@@ -6,7 +6,7 @@ import json
 import logging
 
 HIBP_URL = "https://api.pwnedpasswords.com/range/{prefix}"
-USER_AGENT = "PasswordTesterLocal/1.0"
+USER_AGENT = "PasswordStrengthTester/1.0"
 CACHE_PREFIX = "hibp:"
 CACHE_TTL = 86400  # 24h
 
@@ -52,7 +52,6 @@ async def get_pwned_from_cache(prefix: str) -> Tuple[List[Dict[str, int]], bool]
     cache_key = f"{CACHE_PREFIX}{prefix}"
     cached = await redis.get(cache_key)
     if cached:
-        # Limit response size for security
         try:
             data = json.loads(cached)
             return data, True
@@ -61,4 +60,5 @@ async def get_pwned_from_cache(prefix: str) -> Tuple[List[Dict[str, int]], bool]
     # Miss: fetch and cache
     data = await fetch_hibp_range(prefix)
     await redis.set(cache_key, json.dumps(data), ex=CACHE_TTL)
+    return data, False
     return data, False
