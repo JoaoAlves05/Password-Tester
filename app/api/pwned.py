@@ -3,6 +3,7 @@ from ..schemas import PwnedRequest, PwnedResponse, PwnedCheckRequest, PwnedCheck
 from ..core.hibp import get_pwned_from_cache
 from slowapi.util import get_remote_address
 from slowapi import Limiter
+import hmac
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -27,8 +28,8 @@ async def pwned_check(req: PwnedCheckRequest, request: Request):
 
     if req.suffix:
         suffix = req.suffix.upper()
-        found = next((r for r in results if r["suffix"] == suffix), None)
+        found = next((r for r in results if hmac.compare_digest(r["suffix"], suffix)), None)
         return {"pwned": bool(found), "count": found["count"] if found else 0}
     
-    # Caso não seja fornecido suffix, devolve toda a lista
+    # If no suffix, return all results
     return {"prefix": prefix, "results": results}

@@ -47,6 +47,7 @@ def parse_hibp_response(text: str) -> List[Dict[str, int]]:
 async def get_pwned_from_cache(prefix: str) -> Tuple[List[Dict[str, int]], bool]:
     """
     Try to get from Redis, otherwise fetch and cache.
+    If HIBP fails, return expired cache if available.
     """
     redis = await get_redis()
     cache_key = f"{CACHE_PREFIX}{prefix}"
@@ -58,7 +59,17 @@ async def get_pwned_from_cache(prefix: str) -> Tuple[List[Dict[str, int]], bool]
         except Exception:
             logger.warning("Error reading HIBP cache")
     # Miss: fetch and cache
-    data = await fetch_hibp_range(prefix)
-    await redis.set(cache_key, json.dumps(data), ex=CACHE_TTL)
-    return data, False
-    return data, False
+    try:
+        data = await fetch_hibp_range(prefix)
+        await redis.set(cache_key, json.dumps(data), ex=CACHE_TTL)
+        return data, False
+    except Exception as e:
+        logger.error(f"HIBP fetch failed: {e}")
+        # Try to return expired cache if available
+        if cached:
+            try:
+                data = json.loads(cached)
+                return data, True
+            except Exception:
+                pass
+        raise
