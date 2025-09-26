@@ -1,292 +1,34 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Password Strength Tester</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="demo.css">
-</head>
-<body>
-  <div class="container">
-    <h2>Password Strength Tester</h2>
-    <div class="info">
-      Enter a password to check its strength and exposure.<br>
-      <small>(Nothing is sent in plain text. SHA-1 and zxcvbn are calculated locally.)</small>
+  <head>
+    <meta charset="UTF-8">
+    <title>Password Strength Tester</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="demo.css">
+  </head>
+  
+  <body>
+    <div class="container">
+      <h2>Password Strength Tester</h2>
+      <div class="info">
+        Enter a password to check its strength and exposure.<br>
+        <small>(Nothing is sent in plain text. SHA-1 and zxcvbn are calculated locally.)</small>
+      </div>
+      <label for="pw">Password</label>
+      <div class="input-wrap">
+        <input id="pw" type="password" placeholder="Enter your password" aria-describedby="strength-desc" autocomplete="off">
+        <button class="toggle-visibility" id="togglePw" type="button" aria-label="Show/Hide password">&#128065;</button>
+      </div>
+      <div class="strength-bar" id="strength-bar" aria-hidden="true">
+        <div></div><div></div><div></div><div></div>
+      </div>
+      <div id="strength-desc" class="sr-only"></div>
+      <button id="check">Check</button>
+      <div class="result" id="out"></div>
     </div>
-    <label for="pw">Password</label>
-    <div class="input-wrap">
-      <input id="pw" type="password" placeholder="Enter your password" aria-describedby="strength-desc" autocomplete="off">
-      <button class="toggle-visibility" id="togglePw" type="button" aria-label="Show/Hide password">&#128065;</button>
-    </div>
-    <div class="strength-bar" id="strength-bar" aria-hidden="true">
-      <div></div><div></div><div></div><div></div>
-    </div>
-    <div id="strength-desc" class="sr-only"></div>
-    <button id="check">Check</button>
-    <div class="result" id="out"></div>
-  </div>
-  <script src="/web/demo.js"></script>
-</body>
+
+    <script src="/web/demo.js"></script>
+  </body>
 </html>
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-    }
-    .container {
-      background: #fff;
-      margin-top: 60px;
-      padding: 2.8rem 2.5rem 2.2rem 2.5rem;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      max-width: 440px;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 1.4rem;
-      animation: fadeIn 0.7s;
-      border: 1.5px solid #e0e7ff;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(30px);}
-      to { opacity: 1; transform: translateY(0);}
-    }
-    h2 {
-      margin: 0 0 0.5rem 0;
-      color: var(--primary);
-      font-weight: 800;
-      font-size: 2.2rem;
-      letter-spacing: 1px;
-      text-align: center;
-      text-shadow: 0 2px 8px #e0e7ff;
-    }
-    .info {
-      font-size: 1.08rem;
-      color: var(--gray-text);
-      text-align: center;
-      margin-bottom: 0.5rem;
-      line-height: 1.6;
-    }
-    label {
-      font-weight: 700;
-      color: #333;
-      margin-bottom: 0.5rem;
-      display: block;
-      font-size: 1.12rem;
-      letter-spacing: 0.5px;
-    }
-    .input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: var(--gray-bg);
-      border-radius: 12px;
-      border: 2px solid var(--gray-border);
-      padding: 0.6rem 0.9rem;
-      transition: border var(--transition);
-      box-shadow: 0 2px 8px rgba(37,99,235,0.04);
-    }
-    .input-wrap:focus-within {
-      border: 2px solid var(--primary);
-      box-shadow: 0 4px 16px rgba(37,99,235,0.10);
-    }
-    input[type="password"] {
-      width: 100%;
-      padding: 0.8rem 0.2rem;
-      font-size: 1.15rem;
-      border: none;
-      background: transparent;
-      outline: none;
-      font-family: inherit;
-      color: #222;
-      letter-spacing: 0.5px;
-    }
-    .toggle-visibility {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 1.3rem;
-      color: var(--gray-text);
-      padding: 0;
-      margin: 0;
-      transition: color var(--transition);
-    }
-    .toggle-visibility:hover {
-      color: var(--primary);
-    }
-    .strength-bar {
-      display: flex;
-      height: 15px;
-      margin: 0.3rem 0 0.7rem 0;
-      gap: 8px;
-    }
-    .strength-bar div {
-      flex: 1;
-      border-radius: 5px;
-      background: var(--gray-border);
-      transition: background var(--transition), box-shadow var(--transition);
-      box-shadow: 0 1px 4px rgba(37,99,235,0.07);
-    }
-    .strength-bar .active-0 { background: var(--danger);}
-    .strength-bar .active-1 { background: var(--warning);}
-    .strength-bar .active-2 { background: #facc15;}
-    .strength-bar .active-3 { background: var(--success);}
-    .strength-bar .active-4 { background: var(--primary);}
-    button {
-      width: 100%;
-      padding: 1.05rem;
-      background: linear-gradient(90deg, var(--primary) 60%, var(--primary-dark) 100%);
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      font-size: 1.15rem;
-      font-weight: 800;
-      cursor: pointer;
-      transition: background var(--transition), box-shadow var(--transition);
-      box-shadow: 0 2px 8px rgba(37,99,235,0.09);
-      margin-bottom: 0.2rem;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    button:hover, button:focus {
-      background: linear-gradient(90deg, var(--primary-dark) 60%, var(--primary) 100%);
-      box-shadow: 0 4px 16px rgba(37,99,235,0.13);
-    }
-    .result {
-      background: var(--gray-bg);
-      border-radius: 12px;
-      padding: 1.2rem 1.1rem 1.1rem 1.1rem;
-      font-size: 1.12rem;
-      min-height: 80px;
-      white-space: pre-line;
-      color: #222;
-      border: 1.5px solid var(--gray-border);
-      margin-top: 0.2rem;
-      transition: background var(--transition), border var(--transition);
-      box-shadow: 0 2px 8px rgba(37,99,235,0.04);
-      word-break: break-word;
-      line-height: 1.7;
-    }
-    .result .danger { color: var(--danger); font-weight: 700;}
-    .result .success { color: var(--success); font-weight: 700;}
-    .result .suggestion { color: var(--primary-dark);}
-    .result .meta { color: var(--gray-text); font-size: 0.98rem;}
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0,0,0,0);
-      border: 0;
-    }
-    @media (max-width: 600px) {
-      .container { padding: 1.2rem; }
-      h2 { font-size: 1.3rem;}
-      .result { font-size: 1rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>Password Strength Tester</h2>
-    <div class="info">
-      Enter a password to check its strength and exposure.<br>
-      <small>(Nothing is sent in plain text. SHA-1 and zxcvbn are calculated locally.)</small>
-    </div>
-    <label for="pw">Password</label>
-    <div class="input-wrap">
-      <input id="pw" type="password" placeholder="Enter your password" aria-describedby="strength-desc" autocomplete="off">
-      <button class="toggle-visibility" id="togglePw" type="button" aria-label="Show/Hide password">&#128065;</button>
-    </div>
-    <div class="strength-bar" id="strength-bar" aria-hidden="true">
-      <div></div><div></div><div></div><div></div>
-    </div>
-    <div id="strength-desc" class="sr-only"></div>
-    <button id="check">Check</button>
-    <div class="result" id="out"></div>
-  </div>
-  <script>
-    // Toggle password visibility
-    document.getElementById('togglePw').addEventListener('click', function() {
-      const pwInput = document.getElementById('pw');
-      if (pwInput.type === "password") {
-        pwInput.type = "text";
-        this.innerHTML = "&#128064;";
-      } else {
-        pwInput.type = "password";
-        this.innerHTML = "&#128065;";
-      }
-    });
-
-    function updateStrengthBar(score) {
-      const bar = document.getElementById('strength-bar').children;
-      for (let i = 0; i < 4; i++) {
-        bar[i].className = (i <= score) ? `active-${score}` : '';
-      }
-      // Accessibility: update hidden description
-      document.getElementById('strength-desc').textContent =
-        ["Very weak","Weak","Fair","Good","Excellent"][score];
-    }
-
-    async function sha1Hex(str) {
-      const enc = new TextEncoder();
-      const data = enc.encode(str);
-      const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
-    }
-
-    document.getElementById('pw').addEventListener('input', () => {
-      const pw = document.getElementById('pw').value;
-      const z = zxcvbn(pw);
-      updateStrengthBar(z.score);
-      let msg = `<span class="success">Strength: ${z.score}/4 (${["Very weak","Weak","Fair","Good","Excellent"][z.score]})</span>\n`;
-      if (z.feedback.suggestions.length) msg += `<span class="suggestion">Suggestions: ${z.feedback.suggestions.join("; ")}</span>`;
-      document.getElementById('out').innerHTML = msg;
-    });
-
-    document.getElementById('check').addEventListener('click', async () => {
-      const pw = document.getElementById('pw').value;
-      const out = document.getElementById('out');
-      if (!pw) { out.innerHTML = '<span class="danger">Please enter a password.</span>'; return; }
-      out.innerHTML = 'Checking...';
-      const h = await sha1Hex(pw);
-      const prefix = h.slice(0,5);
-      const suffix = h.slice(5);
-      try {
-        const res = await fetch('/api/v1/pwned-range', {
-          method:'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ prefix })
-        });
-        if (!res.ok) {
-          out.innerHTML = '<span class="danger">Error contacting the server.</span>';
-          return;
-        }
-        const data = await res.json();
-        const found = data.results.find(r => r.suffix === suffix);
-        const z = zxcvbn(pw);
-        updateStrengthBar(z.score);
-        let msg = '';
-        if (found) {
-          msg += `<span class="danger">⚠️ This password has been exposed!<br>Count: ${found.count}</span><br><br>`;
-        } else {
-          msg += '<span class="success">✅ This password was not found in known leaks.</span><br><br>';
-        }
-        msg += `<span class="success">Strength: ${z.score}/4 (${["Very weak","Weak","Fair","Good","Excellent"][z.score]})</span><br>`;
-        if (z.feedback.suggestions.length) msg += `<span class="suggestion">Suggestions: ${z.feedback.suggestions.join("; ")}</span>`;
-        msg += `<div class="meta">Checked at: ${new Date().toLocaleTimeString()}</div>`;
-        out.innerHTML = msg;
-      } catch (e) {
-        out.innerHTML = '<span class="danger">Error contacting the server.</span>';
-      }
-    });
-  </script>
-</body>
-</html>
- 
