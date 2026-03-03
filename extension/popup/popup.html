@@ -44,6 +44,9 @@
     <main class="content-area">
       <section id="view-tester" class="view active" role="tabpanel" aria-labelledby="tab-tester">
         <div class="panel">
+          <div class="hero-section">
+            <h2>Tester</h2>
+          </div>
           <div class="password-field-container">
             <div class="input-group">
               <input type="password" id="passwordInput" placeholder="Type a password..." autocomplete="off" />
@@ -94,7 +97,11 @@
       </section>
 
       <section id="view-generator" class="view" role="tabpanel" aria-labelledby="tab-generator">
-        <div class="panel">
+        <div class="panel generator-grid">
+          <div class="hero-section">
+            <h2>Generator</h2>
+          </div>
+
           <div class="generator-controls">
             <div class="control-group">
               <div class="control-header">
@@ -104,52 +111,37 @@
               <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
             </div>
 
-            <div class="options-grid">
-              <label class="checkbox-card">
+            <div class="compact-toggles">
+              <label class="chip-checkbox">
                 <input type="checkbox" id="includeUpper" checked />
-                <div class="checkbox-content">
-                  <span class="checkbox-label">ABC</span>
-                  <span class="checkbox-sub">Uppercase</span>
-                </div>
+                <span>ABC</span>
               </label>
-
-              <label class="checkbox-card">
+              <label class="chip-checkbox">
                 <input type="checkbox" id="includeLower" checked />
-                <div class="checkbox-content">
-                  <span class="checkbox-label">abc</span>
-                  <span class="checkbox-sub">Lowercase</span>
-                </div>
+                <span>abc</span>
               </label>
-
-              <label class="checkbox-card">
+              <label class="chip-checkbox">
                 <input type="checkbox" id="includeNumbers" checked />
-                <div class="checkbox-content">
-                  <span class="checkbox-label">123</span>
-                  <span class="checkbox-sub">Numbers</span>
-                </div>
+                <span>123</span>
               </label>
-
-              <label class="checkbox-card">
+              <label class="chip-checkbox">
                 <input type="checkbox" id="includeSymbols" checked />
-                <div class="checkbox-content">
-                  <span class="checkbox-label">#$&</span>
-                  <span class="checkbox-sub">Symbols</span>
-                </div>
+                <span>#$&</span>
               </label>
             </div>
 
-            <label class="checkbox-row">
+            <label class="chip-checkbox avoid-similar-chip">
               <input type="checkbox" id="avoidSimilar" />
-              <span>Avoid similar characters (e.g. i, l, 1, L, o, 0, O)</span>
+              <span>Avoid Similar (i, l, 1, 0, O)</span>
             </label>
           </div>
 
           <div class="action-row">
-            <button id="generatePassword" type="button" class="btn btn-primary">Generate Password</button>
+            <button id="generatePassword" type="button" class="btn btn-primary">Generate</button>
           </div>
           <span id="generatorStatus" role="status" aria-live="polite" class="status-message"></span>
-        </div>
-        <div class="generated-output">
+
+          <div class="generated-output-container">
           <label for="generatedResult">Generated password</label>
           <div class="input-with-actions">
             <input type="text" id="generatedResult" readonly />
@@ -169,31 +161,26 @@
                   <polyline points="12 5 19 12 12 19"></polyline>
                 </svg>
               </button>
+              <button id="saveGenerated" class="icon-btn" type="button" aria-label="Save to vault" title="Save">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+              </button>
             </div>
           </div>
-          <div class="generated-actions">
-            <button id="saveGenerated" type="button" class="ghost">Save to vault</button>
-          </div>
         </div>
-
       </section>
 
       <section id="view-vault" class="view" role="tabpanel" aria-labelledby="tab-vault">
         <div id="vaultLocked" class="panel">
-          <div class="panel-headline">
-            <div>
-              <p class="eyebrow">Secure vault</p>
-              <h2>Encrypted locally</h2>
-            </div>
-            <button type="button" class="pill-toggle" data-toggle-target="vaultLockedDescription"
-              data-labels="Details|Hide" aria-expanded="false"></button>
+          <div class="hero-section">
+            <h2>Vault</h2>
           </div>
-          <p id="vaultLockedDescription" class="panel-description" hidden>
-            Unlock with your master password to manage stored credentials.
-          </p>
           <div id="createMaster" class="vault-state hidden">
             <div class="form-intro">
-              <h3>Create a master password</h3>
+              <h3>Create Master Key</h3>
               <p class="modal-lead">Encrypt your vault before syncing. This password never leaves your device.</p>
             </div>
             <form id="createMasterForm" class="form-stack">
@@ -230,8 +217,7 @@
           </div>
           <div id="unlockMaster" class="vault-state">
             <div class="form-intro">
-              <h3>Unlock your vault</h3>
-              <p class="modal-lead">Enter your master password to access your credentials.</p>
+              <h3>Unlock Vault</h3>
             </div>
             <form id="unlockForm" class="form-stack">
               <div class="field-group">
@@ -255,8 +241,7 @@
 
         <div id="vaultUnlocked" class="panel hidden">
           <div class="hero-section">
-            <h2>Your Vault</h2>
-            <p class="subtitle">Manage your secure credentials.</p>
+            <h2>Vault</h2>
           </div>
 
           <div class="vault-toolbar">

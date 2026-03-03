@@ -627,7 +627,7 @@ body[data-theme='dark'] .ghost:hover {
 
 /* Generator Output */
 .generated-actions {
-  margin-top: 16px;
+  display: none; /* Substituted by generator-input-actions */
 }
 
 .generated-output-container {
@@ -754,87 +754,83 @@ body[data-theme='dark'] .generated-output-container {
   box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
-/* Options Grid */
-.options-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+/* Compact Toggles for Generator */
+.compact-toggles {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
 }
 
-.checkbox-card {
+.chip-checkbox {
   position: relative;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.checkbox-card input {
+body[data-theme='dark'] .chip-checkbox {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.chip-checkbox input {
   position: absolute;
   opacity: 0;
-  width: 0;
+  cursor: pointer;
   height: 0;
+  width: 0;
 }
 
-.checkbox-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  backdrop-filter: var(--blur-sm);
-  -webkit-backdrop-filter: var(--blur-sm);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.chip-checkbox:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
 }
 
-.checkbox-card input:checked+.checkbox-content {
-  background: var(--primary-soft);
-  border-color: var(--primary);
+.chip-checkbox input:checked ~ span {
   color: var(--primary);
-}
-
-.checkbox-label {
-  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 4px;
-  font-family: var(--font-mono);
 }
 
-.checkbox-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.chip-checkbox:has(input:checked) {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.checkbox-card input:checked+.checkbox-content .checkbox-sub {
-  color: var(--primary);
-}
-
-.checkbox-card:hover .checkbox-content {
-  border-color: var(--text-soft);
-}
-
-.checkbox-card input:focus-visible+.checkbox-content {
-  box-shadow: var(--focus-ring);
+.avoid-similar-chip {
+  margin-top: 4px;
+  width: 100%;
 }
 
 /* Hero Section */
 .hero-section {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .hero-section h2 {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--text);
-  margin: 0 0 8px;
+  margin: 0;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin: 0;
-  line-height: 1.5;
+  display: none; /* Minimalist override */
 }
 
 /* Password Field */
