@@ -46,6 +46,7 @@
         <div class="panel">
           <div class="hero-section">
             <h2>Tester</h2>
+            <p class="subtitle">Enter a password to analyze its strength.</p>
           </div>
           <div class="password-field-container">
             <div class="input-group">
@@ -100,14 +101,42 @@
         <div class="panel generator-grid">
           <div class="hero-section">
             <h2>Generator</h2>
+            <p class="subtitle">Create strict encrypted keys.</p>
+          </div>
+
+          <div class="generated-output-container">
+            <div class="input-with-actions">
+              <input type="text" id="generatedResult" readonly />
+              <div class="generator-input-actions">
+                <button id="copyGenerated" class="icon-btn" type="button" aria-label="Copy generated password"
+                  title="Copy to clipboard">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+                <button id="useForTest" class="icon-btn" type="button" aria-label="Use in tester" title="Test strength">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </button>
+                <button id="saveGenerated" class="icon-btn" type="button" aria-label="Save to vault" title="Save">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="generator-controls">
-            <div class="control-group">
-              <div class="control-header">
-                <label for="lengthRange">Length</label>
-                <span id="lengthValue" class="value-badge">16</span>
-              </div>
+            <div class="control-group row-align">
+              <label for="lengthRange">Length <span id="lengthValue" class="value-badge">16</span></label>
               <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
             </div>
 
@@ -128,48 +157,17 @@
                 <input type="checkbox" id="includeSymbols" checked />
                 <span>#$&</span>
               </label>
+              <label class="chip-checkbox">
+                <input type="checkbox" id="avoidSimilar" />
+                <span>Avoid similar (l, 1, O, 0)</span>
+              </label>
             </div>
-
-            <label class="chip-checkbox avoid-similar-chip">
-              <input type="checkbox" id="avoidSimilar" />
-              <span>Avoid Similar (i, l, 1, 0, O)</span>
-            </label>
           </div>
 
-          <div class="action-row">
-            <button id="generatePassword" type="button" class="btn btn-primary">Generate</button>
+          <div class="action-row compact-action">
+            <button id="generatePassword" type="button" class="btn btn-primary compact-btn">Generate</button>
           </div>
           <span id="generatorStatus" role="status" aria-live="polite" class="status-message"></span>
-
-          <div class="generated-output-container">
-          <label for="generatedResult">Generated password</label>
-          <div class="input-with-actions">
-            <input type="text" id="generatedResult" readonly />
-            <div class="generator-input-actions">
-              <button id="copyGenerated" class="icon-btn" type="button" aria-label="Copy generated password"
-                title="Copy to clipboard">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-              <button id="useForTest" class="icon-btn" type="button" aria-label="Use in tester" title="Test strength">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-              </button>
-              <button id="saveGenerated" class="icon-btn" type="button" aria-label="Save to vault" title="Save">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -177,15 +175,12 @@
         <div id="vaultLocked" class="panel">
           <div class="hero-section">
             <h2>Vault</h2>
+            <p class="subtitle">Stored locally and intensely encrypted.</p>
           </div>
           <div id="createMaster" class="vault-state hidden">
-            <div class="form-intro">
-              <h3>Create Master Key</h3>
-              <p class="modal-lead">Encrypt your vault before syncing. This password never leaves your device.</p>
-            </div>
             <form id="createMasterForm" class="form-stack">
               <div class="field-group">
-                <label for="newMaster">Master password</label>
+                <label for="newMaster">Create Master Key</label>
                   <div class="input-wrapper has-toggle">
                     <input type="password" id="newMaster" autocomplete="new-password" required
                       placeholder="Choose a strong password" />
@@ -199,7 +194,7 @@
                   </div>
               </div>
               <div class="field-group">
-                <label for="confirmMaster">Confirm password</label>
+                <label for="confirmMaster">Confirm Master Key</label>
                   <div class="input-wrapper has-toggle">
                     <input type="password" id="confirmMaster" autocomplete="new-password" required
                       placeholder="Repeat password" />
@@ -212,13 +207,10 @@
                     </button>
                   </div>
               </div>
-              <button type="submit" class="btn btn-primary">Create vault</button>
+              <button type="submit" class="btn btn-primary compact-btn">Create vault</button>
             </form>
           </div>
           <div id="unlockMaster" class="vault-state">
-            <div class="form-intro">
-              <h3>Unlock Vault</h3>
-            </div>
             <form id="unlockForm" class="form-stack">
               <div class="field-group">
                 <label for="vaultPassphrase">Master password</label>
@@ -242,6 +234,7 @@
         <div id="vaultUnlocked" class="panel hidden">
           <div class="hero-section">
             <h2>Vault</h2>
+            <p class="subtitle">Manage your secure credentials.</p>
           </div>
 
           <div class="vault-toolbar">
