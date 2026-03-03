@@ -2,7 +2,7 @@ import { getStorage, setStorage } from './storage.js';
 import { loadSettings } from './settings.js';
 
 const VAULT_KEY = 'securepassVault';
-const ITERATIONS = 100000;
+const ITERATIONS = 600000;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const STORAGE_PREFERENCE = ['sync', 'local'];
@@ -72,45 +72,45 @@ async function decryptData(record, passphrase) {
   return JSON.parse(DECODER.decode(decrypted));
 }
 
+async function getDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('SecurePassDB', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('vault')) {
+        db.createObjectStore('vault');
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
 async function loadVaultRecord() {
-  for (const area of STORAGE_PREFERENCE) {
-    try {
-      const stored = await getStorage(area, [VAULT_KEY]);
-      if (stored && stored[VAULT_KEY]) {
-        if (area === 'local') {
-          try {
-            await setStorage('sync', { [VAULT_KEY]: stored[VAULT_KEY] });
-          } catch (error) {
-            // ignore sync errors, keep local copy as fallback
-          }
-        }
-        return stored[VAULT_KEY];
-      }
-    } catch (error) {
-      if (area === 'local') {
-        throw error;
-      }
-    }
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('vault', 'readonly');
+      const store = tx.objectStore('vault');
+      const request = store.get(VAULT_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('Failed to load vault from IndexedDB:', error);
+    return null;
   }
-  return null;
 }
 
 async function saveVaultRecord(record) {
-  let savedToSync = false;
-  try {
-    await setStorage('sync', { [VAULT_KEY]: record });
-    savedToSync = true;
-  } catch (error) {
-    // continue with local fallback
-  }
-
-  try {
-    await setStorage('local', { [VAULT_KEY]: record });
-  } catch (error) {
-    if (!savedToSync) {
-      throw error;
-    }
-  }
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('vault', 'readwrite');
+    const store = tx.objectStore('vault');
+    const request = store.put(record, VAULT_KEY);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // --- Persistence & Auto-Lock Logic ---

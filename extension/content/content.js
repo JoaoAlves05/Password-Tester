@@ -1,7 +1,14 @@
 (async () => {
+  const shadowHost = document.createElement('div');
+  shadowHost.id = 'securepass-extension-root';
+  shadowHost.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2147483647; overflow: visible;';
+  document.body.appendChild(shadowHost);
+  const shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
+
   const style = document.createElement('style');
   style.textContent = `
     .securepass-floating {
+      pointer-events: auto;
       position: absolute;
       z-index: 2147483646;
       width: 34px;
@@ -25,6 +32,7 @@
       background: rgba(37, 99, 235, 0.15);
     }
     .securepass-panel {
+      pointer-events: auto;
       position: absolute;
       z-index: 2147483647;
       width: 320px;
@@ -90,7 +98,7 @@
       color: rgba(248, 250, 252, 0.75);
     }
   `;
-  document.documentElement.appendChild(style);
+  shadowRoot.appendChild(style);
 
   const [{ observePasswordFields }, passwordModule] = await Promise.all([
     import(chrome.runtime.getURL('src/formAnalyzer.js')),
@@ -158,19 +166,82 @@
         <span class="securepass-entropy">0 bits</span>
       </div>
       <ul></ul>
+      <div class="securepass-autofill-section" style="display:none; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+        <h3 style="margin-bottom: 4px;">Autofill</h3>
+        <div class="autofill-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+      </div>
       <div class="securepass-actions">
         <button type="button" class="securepass-generate">Generate</button>
         <button type="button" class="securepass-hibp">HIBP</button>
       </div>
       <div class="securepass-status"></div>
     `;
-    document.body.appendChild(panel);
+    shadowRoot.appendChild(panel);
     updatePanel(panel, field.value);
     positionPanel(panel, field);
 
     const statusEl = panel.querySelector('.securepass-status');
     const generateBtn = panel.querySelector('.securepass-generate');
     const hibpBtn = panel.querySelector('.securepass-hibp');
+
+    chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, response => {
+      if (response && response.ok && response.unlocked && response.entries) {
+        const host = window.location.hostname;
+        const matches = response.entries.filter(e => {
+          try {
+             return new URL(e.site).hostname.includes(host) || host.includes(new URL(e.site).hostname);
+          } catch {
+             return e.site.includes(host) || host.includes(e.site);
+          }
+        });
+
+        if (matches.length > 0) {
+          const section = panel.querySelector('.securepass-autofill-section');
+          const list = section.querySelector('.autofill-list');
+          section.style.display = 'block';
+          matches.forEach(m => {
+             const btn = document.createElement('button');
+             btn.type = 'button';
+             btn.textContent = m.username || 'No username';
+             btn.style.cssText = 'background: rgba(37, 99, 235, 0.25); border: none; border-radius: 6px; color: #f8fafc; padding: 4px 8px; font-size: 0.75rem; cursor: pointer; text-align: left; transition: background 0.2s ease;';
+             btn.addEventListener('mouseover', () => btn.style.background = 'rgba(37, 99, 235, 0.45)');
+             btn.addEventListener('mouseout', () => btn.style.background = 'rgba(37, 99, 235, 0.25)');
+             btn.addEventListener('click', () => {
+                field.value = m.password;
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                if (m.username) {
+                  const form = field.form || field.closest('form');
+                  if (form) {
+                    const userField = Array.from(form.elements).find(el => {
+                      if (el === field) return false;
+                      const isTextInput = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'email' || el.name.toLowerCase().includes('user') || el.name.toLowerCase().includes('email'));
+                      return isTextInput;
+                    }) || document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"]');
+                    
+                    if (userField) {
+                      userField.value = m.username;
+                      userField.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                  } else {
+                    const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
+                    for(const inp of inputs) {
+                      if (inp !== field && inp.getBoundingClientRect().top < field.getBoundingClientRect().top) {
+                         inp.value = m.username;
+                         inp.dispatchEvent(new Event('input', { bubbles: true }));
+                         break;
+                      }
+                    }
+                  }
+                }
+                statusEl.textContent = 'Autofilled!';
+             });
+             list.appendChild(btn);
+          });
+          setTimeout(() => positionPanel(panel, field), 10);
+        }
+      }
+    });
 
     const ro = new ResizeObserver(() => {
       positionPanel(panel, field);
@@ -188,7 +259,8 @@
     field.addEventListener('input', inputHandler);
 
     const outsideHandler = event => {
-      if (panel.contains(event.target) || event.target === button) return;
+      const path = event.composedPath();
+      if (path.includes(panel) || path.includes(button)) return;
       cleanup();
     };
     document.addEventListener('click', outsideHandler, true);
@@ -254,7 +326,7 @@
       </svg>
     `;
     button.setAttribute('aria-label', 'Open SecurePass tools');
-    document.body.appendChild(button);
+    shadowRoot.appendChild(button);
 
     const reposition = () => positionFloating(button, field);
     const ro = new ResizeObserver(reposition);
