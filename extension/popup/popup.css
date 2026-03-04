@@ -790,17 +790,16 @@ body[data-theme='dark'] .generated-output-container {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 10px; /* Condensed */
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 2px 8px; /* Extra Condensed padding */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-full);
-  font-size: 0.75rem; /* Shrunk */
+  font-size: 0.70rem; /* Text size Shrunk to a minimum readable state */
   font-weight: 500;
   transition: all 0.2s ease;
   user-select: none;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 body[data-theme='dark'] .chip-checkbox {
@@ -840,7 +839,7 @@ body[data-theme='dark'] .chip-checkbox {
 /* Hero Section */
 .hero-section {
   text-align: center;
-  margin-bottom: 4px;
+  margin-bottom: 24px; /* Added requested extra spacing between header and panels */
 }
 
 .hero-section h2 {
