@@ -135,12 +135,15 @@
           </div>
 
           <div class="generator-controls">
-            <div class="control-group row-align">
+            <!-- Distinct Slider Wrapper -->
+            <div class="control-group row-align slider-row">
               <label for="lengthRange">Length <span id="lengthValue" class="value-badge">16</span></label>
               <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
             </div>
 
-            <div class="compact-toggles">
+            <!-- New Ultra-Grid -->
+            <div class="options-dense-grid">
+              <div class="toggles-grid">
               <label class="chip-checkbox">
                 <input type="checkbox" id="includeUpper" checked />
                 <span>ABC</span>
@@ -157,10 +160,13 @@
                 <input type="checkbox" id="includeSymbols" checked />
                 <span>#$&</span>
               </label>
-              <label class="chip-checkbox">
-                <input type="checkbox" id="avoidSimilar" />
-                <span>Avoid similar (l, 1, O, 0)</span>
-              </label>
+              </div>
+              <div class="toggles-grid-row">
+                <label class="chip-checkbox avoid-similar-chip">
+                  <input type="checkbox" id="avoidSimilar" />
+                  <span>Avoid similar (l, 1, O, 0)</span>
+                </label>
+              </div>
             </div>
           </div>
 
