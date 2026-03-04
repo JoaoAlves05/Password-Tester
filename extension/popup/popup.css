@@ -744,44 +744,50 @@ body[data-theme='dark'] .generated-output-container {
   font-feature-settings: "tnum";
 }
 
-/* Range Slider */
+/* Range Slider (Extreme Minimalism) */
 .range-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
+  height: 2px;
   background: var(--bg-subtle);
   border-radius: var(--radius-full);
   outline: none;
+  transition: height 0.2s ease;
+}
+
+.range-slider:hover {
+  height: 4px;
 }
 
 .range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
-  background: var(--surface);
-  border: 2px solid var(--primary);
+  width: 14px;
+  height: 14px;
+  background: var(--primary);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
 }
 
 .range-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
+  transform: scale(1.3);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.8);
 }
 
 .range-slider:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px var(--primary-soft);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2), 0 0 15px rgba(37, 99, 235, 0.8);
 }
 
-/* Compact Toggles for Generator */
+/* Pure Typographic Toggles for Generator */
 .compact-toggles {
   display: flex;
-  gap: 8px;
+  gap: 14px; /* More horizontal breathing room since there are no borders */
   margin-top: 4px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .chip-checkbox {
@@ -790,21 +796,20 @@ body[data-theme='dark'] .generated-output-container {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px; /* Extra Condensed padding */
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-full);
-  font-size: 0.70rem; /* Text size Shrunk to a minimum readable state */
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  font-size: 0.8rem;
   font-weight: 500;
-  transition: all 0.2s ease;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 body[data-theme='dark'] .chip-checkbox {
-  background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: none;
 }
 
 .chip-checkbox input {
@@ -816,23 +821,26 @@ body[data-theme='dark'] .chip-checkbox {
 }
 
 .chip-checkbox:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+  opacity: 1;
+  color: var(--text);
+  transform: scale(1.05);
 }
 
 .chip-checkbox input:checked ~ span {
   color: var(--primary);
   font-weight: 700;
+  text-shadow: 0 0 12px rgba(37, 99, 235, 0.6);
 }
 
 .chip-checkbox:has(input:checked) {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.4);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  opacity: 1;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .avoid-similar-chip {
-  margin-top: 4px;
+  margin-top: 8px;
   width: 100%;
 }
 
