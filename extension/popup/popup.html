@@ -141,30 +141,33 @@
               <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
             </div>
 
-            <!-- New Ultra-Grid -->
-            <div class="options-dense-grid">
-              <div class="toggles-grid">
-              <label class="chip-checkbox">
+            <!-- Modern Segmented Control -->
+            <div class="segmented-control">
+              <label class="segment-btn">
                 <input type="checkbox" id="includeUpper" checked />
-                <span>ABC</span>
+                <span>A-Z</span>
               </label>
-              <label class="chip-checkbox">
+              <label class="segment-btn">
                 <input type="checkbox" id="includeLower" checked />
-                <span>abc</span>
+                <span>a-z</span>
               </label>
-              <label class="chip-checkbox">
+              <label class="segment-btn">
                 <input type="checkbox" id="includeNumbers" checked />
-                <span>123</span>
+                <span>0-9</span>
               </label>
-              <label class="chip-checkbox">
+              <label class="segment-btn">
                 <input type="checkbox" id="includeSymbols" checked />
-                <span>#$&</span>
+                <span>!@#</span>
               </label>
-              <label class="chip-checkbox avoid-similar-chip">
+            </div>
+
+            <!-- Avoid Similar Toggle Switch -->
+            <div class="toggle-row">
+              <span class="toggle-label-text">Avoid similar characters</span>
+              <label class="switch">
                 <input type="checkbox" id="avoidSimilar" />
-                <span>Avoid similar (l, 1, O, 0)</span>
+                <span class="slider"></span>
               </label>
-              </div>
             </div>
           </div>
 
