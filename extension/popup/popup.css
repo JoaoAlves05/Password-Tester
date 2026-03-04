@@ -785,22 +785,26 @@ body[data-theme='dark'] .generated-output-container {
 .options-dense-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px; /* Tighter vertical bounds */
+  width: 100%; /* Force constraint */
+  box-sizing: border-box;
 }
 
 .toggles-grid {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* Mathematically perfect 4-column layout */
+  gap: 6px; /* Precise internal gap */
+  width: 100%;
 }
 
 .toggles-grid-row {
   display: flex;
   justify-content: center;
+  width: 100%;
 }
 
 .slider-row {
-  margin-bottom: 8px; /* Decouple slider from toggles */
+  margin-bottom: 4px; /* Pull closer to options grid */
 }
 
 /* Micro Chips */
@@ -856,12 +860,13 @@ body[data-theme='dark'] .chip-checkbox {
 .avoid-similar-chip {
   width: 100%;
   padding: 6px 16px;
+  grid-column: 1 / -1; /* For safety if injected into grid, spans all */
 }
 
 /* Hero Section */
 .hero-section {
   text-align: center;
-  margin-bottom: 24px; /* Added requested extra spacing between header and panels */
+  margin-bottom: 32px; /* Massive spacing requested for Tester/Tools breathing room */
 }
 
 .hero-section h2 {
