@@ -631,19 +631,18 @@ body[data-theme='dark'] .ghost:hover {
 }
 
 .generated-output-container {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(37, 99, 235, 0.04);
+  border: none;
   border-radius: var(--radius-lg);
   padding: 10px; /* Compressed padding */
   margin-bottom: 8px; /* Compressed margin */
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  box-shadow: none;
+  transition: background 0.2s ease;
 }
 
 body[data-theme='dark'] .generated-output-container {
-  background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(37, 99, 235, 0.06);
+  border: none;
 }
 
 .generated-password-display {
@@ -1017,12 +1016,17 @@ body[data-theme='dark'] .password-field-container {
 }
 
 .tester-actions {
-  margin-top: 24px; /* Strong separation from the strength tester card */
+  margin-top: 32px; /* Strong separation from the strength tester card */
 }
 
 /* Generator Final Action Area */
+.generator-controls {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
 .compact-action {
-  margin-top: 16px; /* Explicit distance between settings and generate button */
+  margin-top: 4px; /* Maintain gap between options section and layout bottom */
 }
 
 .btn {
@@ -1043,6 +1047,11 @@ body[data-theme='dark'] .password-field-container {
 .btn svg {
   width: 20px;
   height: 20px;
+}
+
+.compact-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .btn-outline {
