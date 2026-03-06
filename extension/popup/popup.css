@@ -844,7 +844,7 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
+  margin-top: 4px; /* Intentionally pulled tight against the Segmented Control */
   padding: 0 4px;
 }
 
@@ -1013,11 +1013,21 @@ body[data-theme='dark'] .password-field-container {
 .action-row {
   display: flex;
   gap: 12px;
+  margin-top: 12px;
+}
+
+.tester-actions {
+  margin-top: 24px; /* Strong separation from the strength tester card */
+}
+
+/* Generator Final Action Area */
+.compact-action {
+  margin-top: 16px; /* Explicit distance between settings and generate button */
 }
 
 .btn {
   flex: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
