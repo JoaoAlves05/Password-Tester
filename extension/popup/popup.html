@@ -72,10 +72,10 @@
           </div>
 
           <div class="action-row tester-actions">
-            <button id="checkHibp" type="button" class="btn btn-outline compact-btn">
+            <button id="checkHibp" type="button" class="btn secondary compact-btn">
               Check for breaches
             </button>
-            <button id="saveTested" type="button" class="btn btn-ghost compact-btn">Save to vault</button>
+            <button id="saveTested" type="button" class="btn secondary compact-btn">Save to vault</button>
           </div>
 
           <div id="tipsContent" class="insights-panel hidden">
@@ -103,7 +103,7 @@
 
           <div class="generated-output-container">
             <div class="input-with-actions">
-              <input type="text" id="generatedResult" readonly placeholder="Click Generate to create a password..." />
+              <input type="text" id="generatedResult" readonly placeholder="Generated password..." />
               <div class="generator-input-actions">
                 <button id="copyGenerated" class="icon-btn" type="button" aria-label="Copy generated password"
                   title="Copy to clipboard">
@@ -403,45 +403,6 @@
             </div>
           </section>
 
-          <!-- Generator Defaults -->
-          <section class="settings-section">
-            <div class="section-header">
-              <h3>Generator Defaults</h3>
-            </div>
-            <div class="card">
-              <div class="card-row">
-                <div class="row-info">
-                  <label for="defaultLengthRange" class="row-label">Default Length</label>
-                  <span class="row-sub">Start new passwords at <span id="defaultLengthLabel"
-                      class="highlight-text">16</span> chars</span>
-                </div>
-              </div>
-              <div class="card-row slider-row">
-                <input type="range" id="defaultLengthRange" min="8" max="64" step="1" value="16" class="range-slider" />
-              </div>
-
-              <div class="divider"></div>
-
-              <div class="card-row wrap-row">
-                <label class="chip-checkbox">
-                  <input type="checkbox" id="defaultUpper" checked />
-                  <span>Uppercase</span>
-                </label>
-                <label class="chip-checkbox">
-                  <input type="checkbox" id="defaultLower" checked />
-                  <span>Lowercase</span>
-                </label>
-                <label class="chip-checkbox">
-                  <input type="checkbox" id="defaultNumbers" checked />
-                  <span>Numbers</span>
-                </label>
-                <label class="chip-checkbox">
-                  <input type="checkbox" id="defaultSymbols" checked />
-                  <span>Symbols</span>
-                </label>
-              </div>
-            </div>
-          </section>
 
           <!-- Sync -->
           <section class="settings-section">
