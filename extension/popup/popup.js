@@ -57,6 +57,8 @@ const importVaultFile = document.getElementById('importVaultFile');
 const clearVaultBtn = document.getElementById('clearVault');
 const toastEl = document.getElementById('toast');
 const viewTabs = document.querySelectorAll('.nav-item');
+const navIndicator = document.getElementById('navIndicator');
+const TAB_ORDER = ['tester', 'generator', 'vault'];
 const views = {
   generator: document.getElementById('view-generator'),
   tester: document.getElementById('view-tester'),
@@ -357,17 +359,61 @@ async function copyToClipboard(value) {
   }
 }
 
+function updateNavIndicator(activeTab) {
+  if (!navIndicator || !activeTab) return;
+  const nav = activeTab.parentElement;
+  const navRect = nav.getBoundingClientRect();
+  const tabRect = activeTab.getBoundingClientRect();
+  const navPadding = parseFloat(getComputedStyle(nav).paddingLeft) || 4;
+  const offsetX = tabRect.left - navRect.left - navPadding;
+  navIndicator.style.width = tabRect.width + 'px';
+  navIndicator.style.transform = `translateX(${offsetX}px)`;
+}
+
 function setView(view) {
   if (!views[view]) return;
+  const oldView = state.currentView;
+  const oldIndex = TAB_ORDER.indexOf(oldView);
+  const newIndex = TAB_ORDER.indexOf(view);
   state.currentView = view;
+
+  // Update tab active states
+  let activeTabEl = null;
   viewTabs.forEach(tab => {
     const isActive = tab.dataset.view === view;
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    if (isActive) activeTabEl = tab;
   });
+
+  // Slide the pill indicator
+  updateNavIndicator(activeTabEl);
+
+  // Directional content slide
+  const goingRight = newIndex > oldIndex;
   Object.entries(views).forEach(([key, section]) => {
     if (!section) return;
-    section.classList.toggle('active', key === view);
+    const isTarget = key === view;
+    // Remove old direction class
+    section.classList.remove('slide-right');
+    if (!isTarget) {
+      // Exiting view: set the exit direction
+      if (goingRight) {
+        // Old content exits to the left (default translateX(-20px))
+      } else {
+        // Old content exits to the right
+        section.classList.add('slide-right');
+      }
+    } else {
+      // Entering view: come from the opposite direction
+      if (goingRight) {
+        section.classList.add('slide-right');
+      }
+      // Force a reflow so the browser picks up the starting position
+      void section.offsetWidth;
+      section.classList.remove('slide-right');
+    }
+    section.classList.toggle('active', isTarget);
   });
 }
 

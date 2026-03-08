@@ -275,16 +275,19 @@ body[data-theme='dark'] .main-nav {
   top: 4px;
   left: 4px;
   height: calc(100% - 8px);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   border-radius: calc(var(--radius-lg) - 4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1;
+  will-change: transform, width;
 }
 
 body[data-theme='dark'] .nav-indicator {
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .nav-item {
@@ -316,23 +319,28 @@ body[data-theme='dark'] .nav-indicator {
 .content-area {
   flex: 1;
   overflow-y: overlay; /* Float scrollbar over content */
-  padding: 24px;
+  overflow-x: hidden;
+  padding: 20px; /* Tighter padding for final spacing */
   position: relative;
 }
 
 .view {
   display: none;
   opacity: 0;
-  transform: translateY(4px) scale(0.95); /* Slight physical drop */
+  transform: translateX(-20px); /* Default: slide out to the left */
   filter: blur(4px);
   transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.view.slide-right {
+  transform: translateX(20px); /* Exiting to the right */
 }
 
 .view.active {
   display: flex;
   flex-direction: column;
   opacity: 1;
-  transform: translateY(0) scale(1); /* Snaps up smoothly */
+  transform: translateX(0); /* Snaps into center */
   filter: blur(0);
 }
 
@@ -593,7 +601,7 @@ body[data-theme='dark'] .ghost:hover {
   border: none;
   border-radius: var(--radius-lg);
   padding: 6px; /* Match tester exactly */
-  margin-bottom: 8px; /* Compressed margin */
+  margin-bottom: 4px; /* Final squeeze */
   box-shadow: none;
   transition: background 0.2s ease;
 }
@@ -741,7 +749,7 @@ body[data-theme='dark'] .generated-output-container {
 /* Generator Final Action Area */
 .generator-controls {
   margin-top: 6px; /* Super squashed to upper generated card */
-  margin-bottom: 32px; /* Massive spacing before generation button */
+  margin-bottom: 24px; /* Reduced spacing so everything fits without scrollbar */
 }
 
 .control-group.slider-row {
