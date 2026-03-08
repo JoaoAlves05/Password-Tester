@@ -511,6 +511,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 2px; /* Super tight cluster of icons */
+  margin-left: 8px; /* Space between input text and icons */
 }
 
 .primary,
@@ -909,6 +910,7 @@ body[data-theme='dark'] .password-field-container {
   display: flex;
   align-items: center;
   padding: 8px 12px;
+  gap: 8px; /* Breathing room between input and action buttons */
 }
 
 .input-group input {
@@ -943,7 +945,7 @@ body[data-theme='dark'] .password-field-container {
 .strength-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
 }
 
@@ -959,9 +961,14 @@ body[data-theme='dark'] .password-field-container {
 }
 
 .strength-meta {
-  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.75rem;
   color: var(--text-soft);
   font-feature-settings: "tnum";
+  line-height: 1.4;
 }
 
 .progress-track {
@@ -1061,9 +1068,14 @@ body[data-theme='dark'] .password-field-container {
 }
 
 .btn-outline {
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(37, 99, 235, 0.06);
   color: var(--primary);
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  box-shadow:
+    0 2px 8px rgba(37, 99, 235, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .btn-outline:hover {
@@ -1071,28 +1083,62 @@ body[data-theme='dark'] .password-field-container {
   color: #fff;
   border-color: var(--primary);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+body[data-theme='dark'] .btn-outline {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(37, 99, 235, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body[data-theme='dark'] .btn-outline:hover {
+  background: var(--primary);
+  box-shadow:
+    0 4px 20px rgba(37, 99, 235, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .btn-ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.5);
   color: var(--text-muted);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .btn-ghost:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text);
-  border-color: rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 body[data-theme='dark'] .btn-ghost {
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 body[data-theme='dark'] .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .modal-header .icon-btn {
@@ -2127,12 +2173,18 @@ body[data-theme='dark'] .form-intro {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.6);
   transition: all 0.2s ease;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.03),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 body[data-theme='dark'] .input-wrapper {
-  background: rgba(0, 0, 0, 0.2);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .input-wrapper:focus-within {
@@ -2143,6 +2195,7 @@ body[data-theme='dark'] .input-wrapper {
 
 body[data-theme='dark'] .input-wrapper:focus-within {
   background: rgba(30, 41, 59, 0.8);
+  box-shadow: 0 0 0 2px var(--primary), 0 4px 16px rgba(37, 99, 235, 0.2);
 }
 
 .input-wrapper input,
