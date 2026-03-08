@@ -474,7 +474,7 @@ textarea:focus {
   border-radius: var(--radius-lg);
   padding: 6px 10px; /* Tighter bounds */
   box-shadow: none;
-  margin-top: 6px; /* Tighter margins */
+  margin-top: 0; /* Let outer padding handle spacing */
   transition: all 0.3s ease;
 }
 
@@ -592,7 +592,7 @@ body[data-theme='dark'] .ghost:hover {
   background: rgba(37, 99, 235, 0.04);
   border: none;
   border-radius: var(--radius-lg);
-  padding: 10px; /* Compressed padding */
+  padding: 6px; /* Match tester exactly */
   margin-bottom: 8px; /* Compressed margin */
   box-shadow: none;
   transition: background 0.2s ease;
@@ -746,7 +746,7 @@ body[data-theme='dark'] .generated-output-container {
 
 .control-group.slider-row {
   width: 100%;
-  margin-bottom: 8px; /* Tidy gap to toggles below */
+  margin-bottom: 2px; /* Pull tightly into the toggles below */
 }
 
 /* Modern Segmented Control */
@@ -756,10 +756,10 @@ body[data-theme='dark'] .generated-output-container {
   box-shadow: none;
   border-radius: 0;
   padding: 0;
-  gap: 4px; /* Tighter internal layout */
+  gap: 6px; /* Balanced inter-button layout */
   width: 100%;
   justify-content: space-between;
-  margin-bottom: 8px; /* Gap to Avoid Similar below */
+  margin-bottom: 4px; /* Tiny gap to Avoid Similar below */
 }
 
 body[data-theme='dark'] .segmented-control {
@@ -771,9 +771,9 @@ body[data-theme='dark'] .segmented-control {
   position: relative;
   cursor: pointer;
   text-align: center;
-  padding: 4px 8px;
+  padding: 8px 12px; /* Fat padded structure */
   border-radius: calc(var(--radius-lg) - 4px);
-  font-size: 0.8rem;
+  font-size: 0.9rem; /* Increased legibility */
   font-weight: 500;
   color: var(--text-muted);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
