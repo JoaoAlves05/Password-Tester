@@ -574,7 +574,7 @@ body[data-theme='dark'] .ghost:hover {
 .generator-grid {
   display: flex;
   flex-direction: column;
-  gap: 2px; /* Hyper tight gap */
+  gap: 12px; /* Match Tester .panel exactly for perfect horizontal sync */
 }
 
 .chip-grid {
@@ -746,7 +746,7 @@ body[data-theme='dark'] .generated-output-container {
 
 .control-group.slider-row {
   width: 100%;
-  margin-bottom: 2px; /* Pull tightly into the toggles below */
+  margin-bottom: -4px; /* Pull tightly into the toggles below */
 }
 
 /* Modern Segmented Control */
@@ -759,7 +759,7 @@ body[data-theme='dark'] .generated-output-container {
   gap: 6px; /* Balanced inter-button layout */
   width: 100%;
   justify-content: space-between;
-  margin-bottom: 4px; /* Tiny gap to Avoid Similar below */
+  margin-bottom: 0px; /* Minimal gap to Avoid Similar below */
 }
 
 body[data-theme='dark'] .segmented-control {
@@ -769,6 +769,7 @@ body[data-theme='dark'] .segmented-control {
 
 .segment-btn {
   position: relative;
+  flex: 1; /* Automatically spread text capsules beautifully across full width */
   cursor: pointer;
   text-align: center;
   padding: 8px 12px; /* Fat padded structure */
@@ -814,7 +815,7 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0; /* Stacked layout requires no heavy top margin */
+  margin-top: -2px; /* Stacked dense layout requires overlap bridging */
   padding: 0;
 }
 
