@@ -472,9 +472,9 @@ textarea:focus {
   background: transparent;
   border: none;
   border-radius: var(--radius-lg);
-  padding: 8px 12px;
+  padding: 6px 10px; /* Tighter bounds */
   box-shadow: none;
-  margin-top: 8px;
+  margin-top: 6px; /* Tighter margins */
   transition: all 0.3s ease;
 }
 
@@ -493,7 +493,7 @@ textarea:focus {
 .generator-input-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px; /* Super tight cluster of icons */
 }
 
 .primary,
@@ -744,29 +744,22 @@ body[data-theme='dark'] .generated-output-container {
   margin-bottom: 32px; /* Massive spacing before generation button */
 }
 
-/* Horizontal Inline Blocks wrapper */
-.generator-inline-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-}
-
 .control-group.slider-row {
-  flex: 1; /* Automatically occupy remaining space left of options */
-  margin: 0;
+  width: 100%;
+  margin-bottom: 8px; /* Tidy gap to toggles below */
 }
 
 /* Modern Segmented Control */
 .segmented-control {
   display: flex;
-  background: transparent; /* Was rgba(0,0,0,0.05) */
+  background: transparent;
   box-shadow: none;
   border-radius: 0;
   padding: 0;
-  gap: 8px; /* Tighter layout for detached buttons */
-  margin: 0;
+  gap: 4px; /* Tighter internal layout */
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 8px; /* Gap to Avoid Similar below */
 }
 
 body[data-theme='dark'] .segmented-control {
@@ -821,7 +814,7 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px; /* Close to horizontal block */
+  margin-top: 0; /* Stacked layout requires no heavy top margin */
   padding: 0;
 }
 
