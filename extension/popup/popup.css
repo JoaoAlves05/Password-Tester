@@ -500,7 +500,8 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 2px; /* Super tight cluster of icons */
-  margin-left: 8px; /* Space between input text and icons */
+  margin-left: 4px; /* Space between input text and icons */
+  flex-shrink: 0; /* Prevent icons from shrinking */
 }
 
 .primary,
@@ -920,12 +921,13 @@ body[data-theme='dark'] .password-field-container {
 
 .input-with-actions input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   font-family: var(--font-mono);
   font-size: 1.1rem;
   color: var(--text);
-  padding: 8px 16px;
+  padding: 8px 12px;
   outline: none;
 }
 
