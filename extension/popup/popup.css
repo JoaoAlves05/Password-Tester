@@ -1573,7 +1573,8 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
   flex-direction: column;
   transform: translateX(20px);
   opacity: 0;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.08);
 }
 
 .settings-panel[aria-hidden='false'] .settings-surface {
@@ -1586,15 +1587,19 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
   flex-shrink: 0;
   padding: 16px 24px;
   background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   position: sticky;
   top: 0;
   z-index: 10;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.03);
 }
 
 body[data-theme='dark'] .settings-header-sticky {
-  background: rgba(2, 6, 23, 0.8);
+  background: rgba(2, 6, 23, 0.85);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
 }
 
 .header-content {
@@ -1622,10 +1627,10 @@ body[data-theme='dark'] .settings-header-sticky {
 }
 
 .settings-content-wrapper {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
 /* Sections & Cards */
@@ -1700,8 +1705,12 @@ body[data-theme='dark'] .card {
 
 .divider {
   height: 1px;
-  background: var(--border-subtle);
+  background: rgba(0, 0, 0, 0.05);
   margin: 0 16px;
+}
+
+body[data-theme='dark'] .divider {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* Theme Toggle */
@@ -1828,16 +1837,21 @@ body[data-theme='dark'] .card {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 14px 16px;
   background: transparent;
   border: none;
   cursor: pointer;
   text-align: left;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  border-radius: 0;
 }
 
 .card-action-btn:hover {
-  background: var(--bg-subtle);
+  background: rgba(37, 99, 235, 0.04);
+}
+
+body[data-theme='dark'] .card-action-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .btn-icon {
@@ -1895,13 +1909,26 @@ body[data-theme='dark'] .card {
 
 /* About Card */
 .about-card {
-  background: var(--surface);
-  border-radius: 16px;
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   padding: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+body[data-theme='dark'] .about-card {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .app-info {
@@ -2172,14 +2199,35 @@ body[data-theme='dark'] .form-intro {
 .form-stack {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   margin-top: 8px;
 }
 
 .field-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+.field-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Vault Form States */
+.vault-state {
+  margin-top: 8px;
+}
+
+.vault-state .form-stack {
+  gap: 14px;
+}
+
+.vault-state .primary {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .input-wrapper {
