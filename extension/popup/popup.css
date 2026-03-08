@@ -519,24 +519,39 @@ textarea:focus {
 }
 
 .primary {
-  background: var(--primary);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 4px 15px rgba(37, 99, 235, 0.4),
+    0 4px 15px rgba(15, 23, 42, 0.25),
     0 1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  backdrop-filter: var(--blur-sm);
-  -webkit-backdrop-filter: var(--blur-sm);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .primary:hover {
-  background: var(--primary-hover);
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
   transform: translateY(-1px);
   box-shadow:
-    0 6px 20px rgba(37, 99, 235, 0.5),
+    0 6px 20px rgba(15, 23, 42, 0.35),
     0 2px 4px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+body[data-theme='dark'] .primary {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.3),
+    0 0 0 0.5px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body[data-theme='dark'] .primary:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.1) 100%);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 0.5px rgba(255, 255, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .secondary {
@@ -662,9 +677,10 @@ body[data-theme='dark'] .generated-output-container {
 
 /* Compact Buttons/Pills */
 .compact-btn {
-  padding: 6px 16px;
+  padding: 10px 20px;
   font-size: 0.85rem;
   font-weight: 600;
+  width: 100%;
 }
 
 .compact-action {
@@ -1549,15 +1565,21 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
 .settings-panel {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(4px);
+  background: transparent;
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
   display: flex;
   justify-content: flex-end;
-  /* Slide in from right */
+}
+
+.settings-panel-glass-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .settings-panel[aria-hidden='false'] {
@@ -1568,13 +1590,22 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
 .settings-surface {
   width: 100%;
   height: 100%;
-  background: var(--bg);
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   display: flex;
   flex-direction: column;
   transform: translateX(20px);
   opacity: 0;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 1;
+}
+
+body[data-theme='dark'] .settings-surface {
+  background: rgba(2, 6, 23, 0.95);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
 }
 
 .settings-panel[aria-hidden='false'] .settings-surface {
@@ -1857,13 +1888,18 @@ body[data-theme='dark'] .card-action-btn:hover {
 .btn-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: var(--bg-subtle);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+body[data-theme='dark'] .btn-icon {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .btn-icon svg {
@@ -2287,20 +2323,34 @@ body[data-theme='dark'] .input-wrapper:focus-within {
 .input-wrapper.has-toggle {
   display: flex;
   align-items: center;
-  padding-right: 6px;
+  padding-right: 8px;
+  gap: 0;
 }
 
 .input-wrapper.has-toggle input {
   flex: 1;
   width: auto;
+  padding-right: 4px;
 }
 
 .input-wrapper.has-toggle .icon-btn {
   color: var(--text-soft);
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper.has-toggle .icon-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .input-wrapper.has-toggle .icon-btn:hover {
@@ -2309,7 +2359,7 @@ body[data-theme='dark'] .input-wrapper:focus-within {
 }
 
 body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
