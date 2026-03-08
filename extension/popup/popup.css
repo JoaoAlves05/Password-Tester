@@ -323,16 +323,16 @@ body[data-theme='dark'] .nav-indicator {
 .view {
   display: none;
   opacity: 0;
-  transform: scale(0.98);
+  transform: translateY(4px) scale(0.95); /* Slight physical drop */
   filter: blur(4px);
-  transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .view.active {
   display: flex;
   flex-direction: column;
   opacity: 1;
-  transform: scale(1);
+  transform: translateY(0) scale(1); /* Snaps up smoothly */
   filter: blur(0);
 }
 
@@ -343,7 +343,7 @@ body[data-theme='dark'] .nav-indicator {
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Tighter gap */
+  gap: 6px; /* Symmetrically compressed global gap */
 }
 
 body[data-theme='dark'] .panel {
@@ -574,7 +574,7 @@ body[data-theme='dark'] .ghost:hover {
 .generator-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Match Tester .panel exactly for perfect horizontal sync */
+  gap: 6px; /* Match Tester .panel exactly for perfect horizontal sync, ultra condensed */
 }
 
 .chip-grid {
@@ -740,7 +740,7 @@ body[data-theme='dark'] .generated-output-container {
 
 /* Generator Final Action Area */
 .generator-controls {
-  margin-top: 16px;
+  margin-top: 6px; /* Super squashed to upper generated card */
   margin-bottom: 32px; /* Massive spacing before generation button */
 }
 
@@ -772,7 +772,7 @@ body[data-theme='dark'] .segmented-control {
   flex: 1; /* Automatically spread text capsules beautifully across full width */
   cursor: pointer;
   text-align: center;
-  padding: 8px 12px; /* Fat padded structure */
+  padding: 10px 12px; /* Fat padded structure proportionally filling vertical row */
   border-radius: calc(var(--radius-lg) - 4px);
   font-size: 0.9rem; /* Increased legibility */
   font-weight: 500;
@@ -815,7 +815,7 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: -2px; /* Stacked dense layout requires overlap bridging */
+  margin-top: -6px; /* Aggressively suck Avoid Similar into the segment controller bounds */
   padding: 0;
 }
 
