@@ -381,12 +381,6 @@ body[data-theme='dark'] .panel {
   box-shadow: inset 0 -1px 8px rgba(15, 23, 42, 0.08);
 }
 
-.input-with-actions .icon-btn {
-  width: 28px;
-  height: 28px;
-  background: rgba(255, 255, 255, 0.4);
-}
-
 body[data-theme='dark'] .pill-toggle {
   background: rgba(255, 255, 255, 0.14);
 }
@@ -744,28 +738,47 @@ body[data-theme='dark'] .generated-output-container {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2), 0 0 15px rgba(37, 99, 235, 0.8);
 }
 
+/* Generator Final Action Area */
+.generator-controls {
+  margin-top: 16px;
+  margin-bottom: 32px; /* Massive spacing before generation button */
+}
+
+/* Horizontal Inline Blocks wrapper */
+.generator-inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.control-group.slider-row {
+  flex: 1; /* Automatically occupy remaining space left of options */
+  margin: 0;
+}
+
 /* Modern Segmented Control */
 .segmented-control {
   display: flex;
-  background: rgba(0, 0, 0, 0.05); /* Very subtle capsule background */
-  border-radius: var(--radius-lg);
-  padding: 4px;
-  gap: 2px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-top: 4px;
+  background: transparent; /* Was rgba(0,0,0,0.05) */
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 8px; /* Tighter layout for detached buttons */
+  margin: 0;
 }
 
 body[data-theme='dark'] .segmented-control {
-  background: rgba(0, 0, 0, 0.3);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+  background: transparent;
+  box-shadow: none;
 }
 
 .segment-btn {
-  flex: 1;
   position: relative;
   cursor: pointer;
   text-align: center;
-  padding: 6px 0;
+  padding: 4px 8px;
   border-radius: calc(var(--radius-lg) - 4px);
   font-size: 0.8rem;
   font-weight: 500;
@@ -783,6 +796,7 @@ body[data-theme='dark'] .segmented-control {
 }
 
 .segment-btn:hover {
+  background: rgba(37, 99, 235, 0.05); /* Blue tint on hover instead of a container */
   color: var(--text);
 }
 
@@ -792,14 +806,14 @@ body[data-theme='dark'] .segmented-control {
 }
 
 .segment-btn:has(input:checked) {
-  background: var(--surface);
+  background: rgba(37, 99, 235, 0.1);
   color: var(--primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); /* Mimics physical slider */
+  box-shadow: none;
 }
 
 body[data-theme='dark'] .segment-btn:has(input:checked) {
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  box-shadow: none;
 }
 
 /* Toggle Row for "Avoid Similar" */
@@ -807,8 +821,8 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 4px; /* Intentionally pulled tight against the Segmented Control */
-  padding: 0 4px;
+  margin-top: 8px; /* Close to horizontal block */
+  padding: 0;
 }
 
 .toggle-label-text {
@@ -983,14 +997,8 @@ body[data-theme='dark'] .password-field-container {
   margin-top: 32px; /* Strong separation from the strength tester card */
 }
 
-/* Generator Final Action Area */
-.generator-controls {
-  margin-top: 24px;
-  margin-bottom: 12px;
-}
-
 .compact-action {
-  margin-top: 4px; /* Maintain gap between options section and layout bottom */
+  margin-top: 0; /* Let generator-controls margin-bottom handle spacing */
 }
 
 .btn {

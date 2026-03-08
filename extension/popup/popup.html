@@ -135,30 +135,33 @@
           </div>
 
           <div class="generator-controls">
-            <!-- Distinct Slider Wrapper -->
-            <div class="control-group row-align slider-row">
-              <label for="lengthRange">Length <span id="lengthValue" class="value-badge">16</span></label>
-              <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
-            </div>
+            <!-- Inline Layout Row -->
+            <div class="generator-inline-row">
+              <!-- Distinct Slider Wrapper -->
+              <div class="control-group row-align slider-row">
+                <label for="lengthRange">Length <span id="lengthValue" class="value-badge">16</span></label>
+                <input type="range" id="lengthRange" class="range-slider" min="6" max="64" value="16" />
+              </div>
 
-            <!-- Modern Segmented Control -->
-            <div class="segmented-control">
-              <label class="segment-btn">
-                <input type="checkbox" id="includeUpper" checked />
-                <span>A-Z</span>
-              </label>
-              <label class="segment-btn">
-                <input type="checkbox" id="includeLower" checked />
-                <span>a-z</span>
-              </label>
-              <label class="segment-btn">
-                <input type="checkbox" id="includeNumbers" checked />
-                <span>0-9</span>
-              </label>
-              <label class="segment-btn">
-                <input type="checkbox" id="includeSymbols" checked />
-                <span>!@#</span>
-              </label>
+              <!-- Modern Segmented Control -->
+              <div class="segmented-control">
+                <label class="segment-btn">
+                  <input type="checkbox" id="includeUpper" checked />
+                  <span>A-Z</span>
+                </label>
+                <label class="segment-btn">
+                  <input type="checkbox" id="includeLower" checked />
+                  <span>a-z</span>
+                </label>
+                <label class="segment-btn">
+                  <input type="checkbox" id="includeNumbers" checked />
+                  <span>0-9</span>
+                </label>
+                <label class="segment-btn">
+                  <input type="checkbox" id="includeSymbols" checked />
+                  <span>!@#</span>
+                </label>
+              </div>
             </div>
 
             <!-- Avoid Similar Toggle Switch -->
