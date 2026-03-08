@@ -475,26 +475,19 @@ textarea:focus {
 .input-with-actions {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border: none;
   border-radius: var(--radius-lg);
-  padding: 4px 8px; /* Tighter padding */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-sm);
+  padding: 8px 12px;
+  box-shadow: none;
   margin-top: 8px;
   transition: all 0.3s ease;
-}
-
-body[data-theme='dark'] .input-with-actions {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .input-with-actions input {
   flex: 1;
   background: transparent;
-  padding: 8px 12px;
+  padding: 8px 16px;
   border: none;
   font-family: var(--font-mono);
   font-size: 1.1rem;
@@ -507,35 +500,6 @@ body[data-theme='dark'] .input-with-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-left: 8px;
-  margin-left: 4px;
-  border-left: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-body[data-theme='dark'] .generator-input-actions {
-  border-left-color: rgba(255, 255, 255, 0.1);
-}
-
-.input-with-actions .icon-btn {
-  padding: 8px;
-  border-radius: 8px;
-  color: var(--text-muted);
-  transition: all 0.2s ease;
-}
-
-.input-with-actions .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text);
-  transform: translateY(-1px);
-}
-
-body[data-theme='dark'] .input-with-actions .icon-btn {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-body[data-theme='dark'] .input-with-actions .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
 }
 
 .primary,
