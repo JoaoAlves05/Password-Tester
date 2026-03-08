@@ -58,7 +58,7 @@ const clearVaultBtn = document.getElementById('clearVault');
 const toastEl = document.getElementById('toast');
 const viewTabs = document.querySelectorAll('.nav-item');
 const navIndicator = document.getElementById('navIndicator');
-const TAB_ORDER = ['tester', 'generator', 'vault'];
+const TAB_ORDER = ['generator', 'tester', 'vault'];
 const views = {
   generator: document.getElementById('view-generator'),
   tester: document.getElementById('view-tester'),

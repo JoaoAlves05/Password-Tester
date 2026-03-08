@@ -291,12 +291,12 @@ body[data-theme='dark'] .main-nav {
 }
 
 body[data-theme='dark'] .nav-indicator {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(37, 99, 235, 0.2);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    0 0 0 0.5px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 4px 16px rgba(37, 99, 235, 0.15),
+    0 0 0 0.5px rgba(37, 99, 235, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .nav-item {
@@ -532,7 +532,10 @@ textarea:focus {
   background: var(--primary);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+  box-shadow:
+    0 4px 15px rgba(37, 99, 235, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   backdrop-filter: var(--blur-sm);
   -webkit-backdrop-filter: var(--blur-sm);
 }
@@ -540,13 +543,19 @@ textarea:focus {
 .primary:hover {
   background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  box-shadow:
+    0 6px 20px rgba(37, 99, 235, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .secondary {
   background: var(--bg-subtle);
   color: var(--text);
   border: 1px solid var(--border);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   backdrop-filter: var(--blur-md);
   -webkit-backdrop-filter: var(--blur-md);
 }
@@ -609,16 +618,22 @@ body[data-theme='dark'] .ghost:hover {
   background: rgba(37, 99, 235, 0.04);
   border: none;
   border-radius: var(--radius-lg);
-  padding: 6px; /* Match tester exactly */
-  margin-bottom: 4px; /* Final squeeze */
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  padding: 6px;
+  margin-bottom: 4px;
+  box-shadow:
+    0 2px 12px rgba(37, 99, 235, 0.06),
+    0 0 0 0.5px rgba(37, 99, 235, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transition: background 0.2s ease, box-shadow 0.3s ease;
 }
 
 body[data-theme='dark'] .generated-output-container {
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(37, 99, 235, 0.08);
   border: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(37, 99, 235, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .generated-password-display {
@@ -870,14 +885,20 @@ body[data-theme='dark'] .segment-btn:has(input:checked) {
   border: none;
   border-radius: var(--radius-lg);
   padding: 6px;
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 2px 12px rgba(37, 99, 235, 0.06),
+    0 0 0 0.5px rgba(37, 99, 235, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transition: background 0.2s ease, box-shadow 0.3s ease;
 }
 
 body[data-theme='dark'] .password-field-container {
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(37, 99, 235, 0.08);
   border: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(37, 99, 235, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .password-field-container:focus-within {
