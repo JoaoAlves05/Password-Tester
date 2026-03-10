@@ -2301,14 +2301,19 @@ body[data-theme='dark'] .input-wrapper:focus-within {
 .input-wrapper input,
 .input-wrapper textarea {
   width: 100%;
-  background: transparent;
+  background: transparent !important;
   border: none;
   padding: 14px 16px;
   font-size: 0.95rem;
   color: var(--text);
   border-radius: inherit;
-  box-shadow: none;
+  box-shadow: none !important;
   /* Override default input shadow */
+}
+
+body[data-theme='dark'] .input-wrapper input,
+body[data-theme='dark'] .input-wrapper textarea {
+  background: transparent !important;
 }
 
 /* Stop Chrome autofill from breaking glassmorphism */
