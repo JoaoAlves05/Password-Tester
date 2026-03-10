@@ -2356,13 +2356,15 @@ body[data-theme='dark'] .input-wrapper:focus-within {
 }
 
 .input-wrapper.has-toggle .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text);
+  color: var(--primary);
+  background: transparent;
+  transform: scale(1.05);
 }
 
 body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
   color: #fff;
+  background: transparent;
+  transform: scale(1.05);
 }
 
 .optional {
