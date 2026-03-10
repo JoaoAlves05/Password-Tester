@@ -2415,13 +2415,24 @@ body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
   justify-content: flex-end;
 }
 
+.modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 10px;
 }
 
 body[data-theme='dark'] .modal-actions {

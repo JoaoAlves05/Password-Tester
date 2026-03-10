@@ -575,47 +575,38 @@
           <h3 id="entryModalTitle">Save credential</h3>
         </div>
       </header>
-      <div class="form-stack">
-        <div class="form-intro">
-          <p class="eyebrow">Vault entry</p>
-          <p class="modal-lead">Only encrypted data leaves this device. Capture the essentials with clarity.</p>
-          <div class="modal-chips">
-            <span class="pill-indicator neutral">AES-256</span>
-            <span class="pill-indicator">Zero-knowledge</span>
+      <div class="modal-body">
+        <div class="card">
+          <div class="card-form-stack">
+            <div class="field-group">
+              <label for="entrySite">Website or app</label>
+              <div class="input-wrapper">
+                <input type="text" id="entrySite" placeholder="e.g. https://google.com" required />
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="entryUsername">Username</label>
+              <div class="input-wrapper">
+                <input type="text" id="entryUsername" placeholder="e.g. user@email.com" />
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="entryPassword">Password</label>
+              <div class="input-wrapper">
+                <input type="text" id="entryPassword" class="font-mono" required />
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="entryNotes">Notes <span class="optional">(Optional)</span></label>
+              <div class="input-wrapper">
+                <textarea id="entryNotes" rows="2" placeholder="PINs, security questions..."></textarea>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="field-group">
-          <label for="entrySite">Website or app</label>
-          <div class="input-wrapper">
-            <input type="text" id="entrySite" placeholder="e.g. https://google.com" required />
-          </div>
-          <span class="hint">The URL or name of the service.</span>
-        </div>
-
-        <div class="field-group">
-          <label for="entryUsername">Username</label>
-          <div class="input-wrapper">
-            <input type="text" id="entryUsername" placeholder="e.g. user@email.com" />
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label for="entryPassword">Password</label>
-          <div class="input-wrapper">
-            <input type="text" id="entryPassword" class="font-mono" required />
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label for="entryNotes">Notes <span class="optional">(Optional)</span></label>
-          <div class="input-wrapper">
-            <textarea id="entryNotes" rows="3" placeholder="Security questions, PINs, or other details..."></textarea>
-          </div>
-        </div>
-
         <div class="modal-actions">
-          <button type="button" data-close="entryModal" class="secondary">Cancel</button>
-          <button type="submit" class="primary">Save credential</button>
+          <button type="button" data-close="entryModal" class="secondary compact-btn">Cancel</button>
+          <button type="submit" class="primary compact-btn">Save</button>
         </div>
       </div>
     </form>
@@ -635,56 +626,50 @@
           <h3 id="masterModalTitle">Change master password</h3>
         </div>
       </header>
-      <div class="form-stack">
-        <div class="form-intro">
-          <p class="eyebrow">Security</p>
-          <p class="modal-lead">We will re-encrypt the vault with your new master password immediately.</p>
-        </div>
-        <div class="field-group">
-          <label for="currentMaster">Current master password</label>
-            <div class="input-wrapper has-toggle">
-              <input type="password" id="currentMaster" autocomplete="current-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="currentMaster" aria-label="Show password" tabindex="-1">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
+      <div class="modal-body">
+        <div class="card">
+          <div class="card-form-stack">
+            <div class="field-group">
+              <label for="currentMaster">Current password</label>
+              <div class="input-wrapper has-toggle">
+                <input type="password" id="currentMaster" autocomplete="current-password" required />
+                <button type="button" class="icon-btn" data-toggle-password="currentMaster" aria-label="Show password" tabindex="-1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
             </div>
-        </div>
-
-        <div class="field-group">
-          <label for="nextMaster">New master password</label>
-            <div class="input-wrapper has-toggle">
-              <input type="password" id="nextMaster" autocomplete="new-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="nextMaster" aria-label="Show password" tabindex="-1">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
+            <div class="field-group">
+              <label for="nextMaster">New password</label>
+              <div class="input-wrapper has-toggle">
+                <input type="password" id="nextMaster" autocomplete="new-password" required />
+                <button type="button" class="icon-btn" data-toggle-password="nextMaster" aria-label="Show password" tabindex="-1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
             </div>
-        </div>
-
-        <div class="field-group">
-          <label for="confirmNextMaster">Confirm new master password</label>
-            <div class="input-wrapper has-toggle">
-              <input type="password" id="confirmNextMaster" autocomplete="new-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="confirmNextMaster" aria-label="Show password" tabindex="-1">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
+            <div class="field-group">
+              <label for="confirmNextMaster">Confirm new password</label>
+              <div class="input-wrapper has-toggle">
+                <input type="password" id="confirmNextMaster" autocomplete="new-password" required />
+                <button type="button" class="icon-btn" data-toggle-password="confirmNextMaster" aria-label="Show password" tabindex="-1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
             </div>
+          </div>
         </div>
-
         <div class="modal-actions">
-          <button type="button" data-close="masterModal" class="secondary">Cancel</button>
-          <button type="submit" class="primary">Update master password</button>
+          <button type="button" data-close="masterModal" class="secondary compact-btn">Cancel</button>
+          <button type="submit" class="primary compact-btn">Update</button>
         </div>
       </div>
     </form>
