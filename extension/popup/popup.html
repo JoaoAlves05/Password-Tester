@@ -180,27 +180,28 @@
             <p class="subtitle">Stored locally and intensely encrypted.</p>
           </div>
           <div id="createMaster" class="vault-state hidden">
-            <form id="createMasterForm" class="form-stack">
-              <div class="field-group">
-                <label for="newMaster">Create Master Key</label>
-                  <div class="input-wrapper has-toggle">
-                    <input type="password" id="newMaster" autocomplete="new-password" required
-                      placeholder="Choose a strong password" />
-                    <button type="button" class="icon-btn" data-toggle-password="newMaster" aria-label="Show password">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                    </button>
-                  </div>
-              </div>
+            <div class="card">
+              <form id="createMasterForm" class="form-stack">
+                <div class="field-group">
+                  <label for="newMaster">Create Master Key</label>
+                    <div class="input-wrapper has-toggle">
+                      <input type="password" id="newMaster" autocomplete="new-password" required
+                        placeholder="Choose a strong password" />
+                      <button type="button" class="icon-btn" data-toggle-password="newMaster" aria-label="Show password" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                          stroke-linejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                    </div>
+                </div>
               <div class="field-group">
                 <label for="confirmMaster">Confirm Master Key</label>
                   <div class="input-wrapper has-toggle">
                     <input type="password" id="confirmMaster" autocomplete="new-password" required
                       placeholder="Repeat password" />
-                    <button type="button" class="icon-btn" data-toggle-password="confirmMaster" aria-label="Show password">
+                    <button type="button" class="icon-btn" data-toggle-password="confirmMaster" aria-label="Show password" tabindex="-1">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -211,25 +212,28 @@
               </div>
               <button type="submit" class="primary compact-btn">Create vault</button>
             </form>
+            </div>
           </div>
           <div id="unlockMaster" class="vault-state">
-            <form id="unlockForm" class="form-stack">
-              <div class="field-group">
-                <label for="vaultPassphrase">Master password</label>
-                  <div class="input-wrapper has-toggle">
-                    <input type="password" id="vaultPassphrase" autocomplete="current-password" required
-                      placeholder="Enter password" />
-                    <button type="button" class="icon-btn" data-toggle-password="vaultPassphrase" aria-label="Show password">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                    </button>
-                  </div>
-              </div>
-              <button type="submit" class="primary">Unlock vault</button>
-            </form>
+            <div class="card">
+              <form id="unlockForm" class="form-stack">
+                <div class="field-group">
+                  <label for="vaultPassphrase">Master password</label>
+                    <div class="input-wrapper has-toggle">
+                      <input type="password" id="vaultPassphrase" autocomplete="current-password" required
+                        placeholder="Enter password" />
+                      <button type="button" class="icon-btn" data-toggle-password="vaultPassphrase" aria-label="Show password" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                          stroke-linejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                    </div>
+                </div>
+                <button type="submit" class="primary">Unlock vault</button>
+              </form>
+            </div>
           </div>
         </div>
 
@@ -641,7 +645,7 @@
           <label for="currentMaster">Current master password</label>
             <div class="input-wrapper has-toggle">
               <input type="password" id="currentMaster" autocomplete="current-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="currentMaster" aria-label="Show password">
+              <button type="button" class="icon-btn" data-toggle-password="currentMaster" aria-label="Show password" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
                   stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -655,7 +659,7 @@
           <label for="nextMaster">New master password</label>
             <div class="input-wrapper has-toggle">
               <input type="password" id="nextMaster" autocomplete="new-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="nextMaster" aria-label="Show password">
+              <button type="button" class="icon-btn" data-toggle-password="nextMaster" aria-label="Show password" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
                   stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -669,7 +673,7 @@
           <label for="confirmNextMaster">Confirm new master password</label>
             <div class="input-wrapper has-toggle">
               <input type="password" id="confirmNextMaster" autocomplete="new-password" required />
-              <button type="button" class="icon-btn" data-toggle-password="confirmNextMaster" aria-label="Show password">
+              <button type="button" class="icon-btn" data-toggle-password="confirmNextMaster" aria-label="Show password" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
                   stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
