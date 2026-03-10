@@ -2139,34 +2139,20 @@ body[data-theme='dark'] .about-card {
 
 .modal-content {
   width: 100%;
-  background: var(--surface);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: var(--radius-lg);
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  background: transparent;
   display: flex;
   flex-direction: column;
   margin: 16px;
-  overflow: hidden;
   max-height: calc(100vh - 32px);
-  overflow-y: auto;
 }
 
 body[data-theme='dark'] .modal-content {
-  background: rgba(24, 24, 27, 0.85);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 0.5px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: transparent;
 }
 
 .modal-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  border-bottom: none;
   display: flex;
   gap: 12px;
   align-items: center;
