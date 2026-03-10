@@ -2311,6 +2311,24 @@ body[data-theme='dark'] .input-wrapper:focus-within {
   /* Override default input shadow */
 }
 
+/* Stop Chrome autofill from breaking glassmorphism */
+.input-wrapper input:-webkit-autofill,
+.input-wrapper input:-webkit-autofill:hover, 
+.input-wrapper input:-webkit-autofill:focus, 
+.input-wrapper input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: var(--text);
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: inset 0 0 20px 20px transparent;
+}
+
+body[data-theme='dark'] .input-wrapper input:-webkit-autofill,
+body[data-theme='dark'] .input-wrapper input:-webkit-autofill:hover, 
+body[data-theme='dark'] .input-wrapper input:-webkit-autofill:focus,
+body[data-theme='dark'] .input-wrapper input:-webkit-autofill:active {
+  -webkit-text-fill-color: #f8fafc;
+}
+
 .input-wrapper input:focus,
 .input-wrapper textarea:focus {
   box-shadow: none;
