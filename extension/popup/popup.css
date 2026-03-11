@@ -1567,13 +1567,15 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
 .settings-panel {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--bg);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.35s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2120,6 +2122,7 @@ body[data-theme='dark'] .about-card {
     radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
   opacity: 1;
   z-index: 1001;
+  transition: opacity 0.35s ease;
 }
 
 .modal-backdrop.hidden {
@@ -2147,6 +2150,18 @@ body[data-theme='dark'] .about-card {
   display: flex;
   flex-direction: column;
   padding: 8px 16px 16px;
+  animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 body[data-theme='dark'] .modal-content {
@@ -2178,9 +2193,10 @@ body[data-theme='dark'] .modal-header {
 
 .modal-header-title h3 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--text);
+  opacity: 0.85;
 }
 
 .form-intro {
@@ -2235,6 +2251,23 @@ body[data-theme='dark'] .form-intro {
 /* Vault Form States */
 .vault-state {
   margin-top: 8px;
+  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#vaultLocked,
+#vaultUnlocked {
+  transition: opacity 0.3s ease;
 }
 
 .vault-state .form-stack {
@@ -2423,6 +2456,16 @@ body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
     0 2px 8px rgba(0, 0, 0, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.modal-body > .card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25);
 }
 
 body[data-theme='dark'] .modal-body > .card {
@@ -2433,6 +2476,37 @@ body[data-theme='dark'] .modal-body > .card {
     0 2px 8px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+body[data-theme='dark'] .modal-body > .card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.card-form-stack .input-wrapper:focus-within {
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+body[data-theme='dark'] .card-form-stack .input-wrapper:focus-within {
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.card-form-stack .field-group label {
+  transition: color 0.2s ease;
+}
+
+.card-form-stack .field-group:focus-within label {
+  color: var(--primary);
 }
 
 .card-form-stack {
