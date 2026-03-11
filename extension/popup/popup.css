@@ -538,6 +538,14 @@ textarea:focus {
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+.primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 body[data-theme='dark'] .primary {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
   border-color: rgba(255, 255, 255, 0.15);
@@ -569,6 +577,11 @@ body[data-theme='dark'] .primary:hover {
 .secondary:hover {
   background: rgba(15, 23, 42, 0.12);
   color: var(--text-emphasis);
+  transform: translateY(-1px);
+}
+
+.secondary:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .ghost {
@@ -582,6 +595,10 @@ body[data-theme='dark'] .primary:hover {
   background: rgba(37, 99, 235, 0.05);
   border-color: var(--primary);
   transform: translateY(-1px);
+}
+
+.ghost:active {
+  transform: translateY(0) scale(0.98);
 }
 
 body[data-theme='dark'] .secondary {
@@ -1058,6 +1075,15 @@ body[data-theme='dark'] .password-field-container {
   display: flex;
   gap: 12px;
   margin-top: 12px;
+  width: 100%;
+}
+
+.action-row .primary,
+.action-row .secondary {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+  margin: 0;
 }
 
 .tester-actions {
@@ -1323,31 +1349,48 @@ body[data-theme='dark'] .search-container input {
 
 .vault-item {
   background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-lg);
   padding: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 body[data-theme='dark'] .vault-item {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .vault-item:hover {
   transform: translateY(-2px) scale(1.01);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25);
   border-color: var(--primary-soft);
-  background: rgba(255, 255, 255, 0.4);
 }
 
 body[data-theme='dark'] .vault-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .vault-item-header {
