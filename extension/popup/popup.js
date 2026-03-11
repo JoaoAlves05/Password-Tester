@@ -654,6 +654,11 @@ function closeModal(id) {
     return;
   }
   modalBackdrop.classList.add('hidden');
+  // Return to Settings if masterModal was opened from there
+  if (id === 'masterModal' && state._masterModalFromSettings) {
+    state._masterModalFromSettings = false;
+    settingsPanel.setAttribute('aria-hidden', 'false');
+  }
 }
 
 function openModal(id) {
@@ -1241,6 +1246,7 @@ function attachEventListeners() {
   const changeMasterKeyBtn = document.getElementById('changeMasterKeyBtn');
   if (changeMasterKeyBtn) {
     changeMasterKeyBtn.addEventListener('click', () => {
+      state._masterModalFromSettings = true;
       settingsPanel.setAttribute('aria-hidden', 'true');
       openModal(masterModal);
     });

@@ -1607,24 +1607,27 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 12px;
   width: 100%;
+  justify-content: center;
 }
 
 .header-content h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--text);
+  opacity: 0.85;
 }
 
 .back-btn {
-  margin-left: -8px;
+  position: absolute;
+  left: 16px;
   color: var(--text);
 }
 
@@ -1738,15 +1741,8 @@ body[data-theme='dark'] .divider {
 /* Theme Toggle */
 .theme-toggle-group {
   display: flex;
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--border);
   padding: 4px;
-  border-radius: 12px;
   gap: 4px;
-}
-
-body[data-theme='dark'] .theme-toggle-group {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .theme-option {
