@@ -2306,26 +2306,6 @@ body[data-theme='dark'] .form-intro {
   transition: opacity 0.3s ease;
 }
 
-.vault-state .card {
-  background: rgba(37, 99, 235, 0.04);
-  border: none;
-  border-radius: var(--radius-lg);
-  padding: 6px;
-  box-shadow:
-    0 2px 12px rgba(37, 99, 235, 0.06),
-    0 0 0 0.5px rgba(37, 99, 235, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  transition: background 0.2s ease, box-shadow 0.3s ease;
-}
-
-body[data-theme='dark'] .vault-state .card {
-  background: rgba(37, 99, 235, 0.08);
-  box-shadow:
-    0 2px 16px rgba(0, 0, 0, 0.2),
-    0 0 0 0.5px rgba(37, 99, 235, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
 .vault-state .form-stack {
   gap: 14px;
 }
