@@ -2310,7 +2310,7 @@ body[data-theme='dark'] .form-intro {
   background: rgba(37, 99, 235, 0.04);
   border: none;
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 8px; /* Slightly tighter padding to look clean and modern */
   box-shadow:
     0 2px 12px rgba(37, 99, 235, 0.06),
     0 0 0 0.5px rgba(37, 99, 235, 0.08),
@@ -2328,11 +2328,12 @@ body[data-theme='dark'] .vault-state .card {
 }
 
 .vault-state .form-stack {
-  gap: 14px;
+  gap: 12px;
+  padding: 4px; /* Inner form padding for clean input alignment */
 }
 
 .vault-state .primary {
-  margin-top: 8px;
+  margin-top: 8px; /* Slightly more space above the unlock/create button */
   width: 100%;
 }
 
@@ -2371,7 +2372,7 @@ body[data-theme='dark'] .input-wrapper:focus-within {
   width: 100%;
   background: transparent !important;
   border: none;
-  padding: 14px 16px;
+  padding: 8px 16px;
   font-size: 0.95rem;
   color: var(--text);
   border-radius: inherit;
