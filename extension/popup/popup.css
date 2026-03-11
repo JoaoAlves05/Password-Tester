@@ -2444,10 +2444,16 @@ body[data-theme='dark'] .modal-body > .card {
 
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 0 16px 8px;
+  gap: 12px;
+  padding: 0 16px 16px;
   margin-top: auto;
+}
+
+.modal-actions .primary,
+.modal-actions .secondary {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
 }
 
 body[data-theme='dark'] .modal-actions {
