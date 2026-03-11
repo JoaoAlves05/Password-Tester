@@ -1761,34 +1761,27 @@ body[data-theme='dark'] .theme-toggle-group {
   height: 0;
 }
 
-.theme-box {
+.theme-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  aspect-ratio: 16/10;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
+  padding: 8px;
   border-radius: var(--radius-md);
   color: var(--text-muted);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: var(--blur-sm);
-  -webkit-backdrop-filter: var(--blur-sm);
+  transition: color 0.3s ease;
+  cursor: pointer;
 }
 
-.theme-box svg {
+.theme-icon svg {
   width: 20px;
   height: 20px;
 }
 
-.theme-option input:checked~.theme-box {
-  border-color: var(--primary);
+.theme-option input:checked ~ .theme-icon {
   color: var(--primary);
-  background: var(--primary-soft);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.theme-option:hover .theme-box {
+.theme-option:hover .theme-icon {
   color: var(--text);
 }
 

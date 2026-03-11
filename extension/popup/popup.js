@@ -1116,7 +1116,7 @@ function attachEventListeners() {
   });
 
   addEntryBtn.addEventListener('click', () => openEntryModal());
-  changeMasterBtn.addEventListener('click', () => openMasterModal());
+  if (changeMasterBtn) changeMasterBtn.addEventListener('click', () => openMasterModal());
   lockVaultBtn.addEventListener('click', () => lockVault(true));
 
   vaultSearch.addEventListener('input', event => {
@@ -1236,6 +1236,15 @@ function attachEventListeners() {
       });
     }
   });
+
+  // Change Master Key (from Settings page)
+  const changeMasterKeyBtn = document.getElementById('changeMasterKeyBtn');
+  if (changeMasterKeyBtn) {
+    changeMasterKeyBtn.addEventListener('click', () => {
+      settingsPanel.setAttribute('aria-hidden', 'true');
+      openModal(masterModal);
+    });
+  }
 
   // Reset Settings
   const resetSettingsBtn = document.getElementById('resetSettings');
