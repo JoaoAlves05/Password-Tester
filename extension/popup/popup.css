@@ -2407,8 +2407,11 @@ body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
   padding: 0 16px 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 16px;
+}
+
+.modal-body > .card {
+  margin: auto 0;
 }
 
 .card-form-stack {
