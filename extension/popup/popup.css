@@ -1646,7 +1646,20 @@ body[data-theme='dark'] .vault-icon-btn[aria-label="Delete credential"]:hover {
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+}
+
+.settings-section .section-header {
+  text-align: center;
+}
+
+.settings-section .section-header h3 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
 }
 
 /* Base Card Style */
@@ -1725,10 +1738,15 @@ body[data-theme='dark'] .divider {
 /* Theme Toggle */
 .theme-toggle-group {
   display: flex;
-  background: var(--bg-subtle);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border);
   padding: 4px;
   border-radius: 12px;
   gap: 4px;
+}
+
+body[data-theme='dark'] .theme-toggle-group {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .theme-option {
