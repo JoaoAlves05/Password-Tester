@@ -2113,9 +2113,7 @@ body[data-theme='dark'] .about-card {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg);
   opacity: 1;
   z-index: 1001;
 }
@@ -2412,6 +2410,19 @@ body[data-theme='dark'] .input-wrapper.has-toggle .icon-btn:hover {
 
 .modal-body > .card {
   margin: auto 0;
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+body[data-theme='dark'] .modal-body > .card {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .card-form-stack {
