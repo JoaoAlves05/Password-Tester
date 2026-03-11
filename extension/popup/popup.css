@@ -2306,6 +2306,30 @@ body[data-theme='dark'] .form-intro {
   transition: opacity 0.3s ease;
 }
 
+.vault-state .card {
+  background: rgba(37, 99, 235, 0.08); /* Generator's visible blue tint */
+  border: 1px solid rgba(255, 255, 255, 0.5); /* Glass border */
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    0 8px 32px rgba(37, 99, 235, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+}
+
+body[data-theme='dark'] .vault-state .card {
+  background: rgba(37, 99, 235, 0.12); /* Slightly stronger dark mode blue */
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
 .vault-state .form-stack {
   gap: 14px;
 }
