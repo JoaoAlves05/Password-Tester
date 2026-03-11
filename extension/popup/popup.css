@@ -2157,7 +2157,7 @@ body[data-theme='dark'] .about-card {
     radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
   opacity: 1;
-  z-index: 1001;
+  z-index: 2001;
   transition: opacity 0.35s ease;
 }
 
@@ -2172,7 +2172,7 @@ body[data-theme='dark'] .about-card {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1002;
+  z-index: 2002;
 }
 
 .modal.hidden {
