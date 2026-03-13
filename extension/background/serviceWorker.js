@@ -14,6 +14,7 @@ import {
   importVaultData,
   keepAlive
 } from '../src/cryptoVault.js';
+import { validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
 
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await loadSettings();
@@ -25,7 +26,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
       case 'HIBP_CHECK': {
         try {
-          const result = await checkPassword(message.password);
+          const password = validateString(message.password, 1024, 'password', true);
+          const result = await checkPassword(password);
           sendResponse({ ok: true, result });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -34,7 +36,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'GENERATE_PASSWORD': {
         try {
-          const generated = await generatePassword(message.constraints || {});
+          const constraints = validateConstraints(message.constraints);
+          const generated = await generatePassword(constraints);
           sendResponse({ ok: true, password: generated });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -47,14 +50,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
       case 'SAVE_SETTINGS': {
+        // Assume settings module handles this safely or add validation
         await saveSettings(message.settings);
         sendResponse({ ok: true });
         break;
       }
       case 'UNLOCK_VAULT': {
         try {
-          await initializeVault(message.passphrase);
-          const data = await unlockVault(message.passphrase, message.timeoutMinutes);
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
+          await initializeVault(passphrase);
+          const data = await unlockVault(passphrase, message.timeoutMinutes);
           sendResponse({ ok: true, data });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -63,8 +68,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'STORE_CREDENTIAL': {
         try {
-          const entry = await storeCredential(message.entry, message.passphrase);
-          sendResponse({ ok: true, entry });
+          const entry = validateEntry(message.entry);
+          if (!entry.password) throw new Error('Password is required');
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', false);
+          const stored = await storeCredential(entry, passphrase);
+          sendResponse({ ok: true, entry: stored });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
         }
@@ -72,7 +80,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'UPDATE_CREDENTIAL': {
         try {
-          const entry = await updateCredential(message.id, message.updates, message.passphrase);
+          const id = validateString(message.id, 64, 'id', true);
+          const updates = validateEntry(message.updates, true);
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', false);
+          const entry = await updateCredential(id, updates, passphrase);
           sendResponse({ ok: true, entry });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -81,7 +92,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'DELETE_CREDENTIAL': {
         try {
-          await deleteCredential(message.id, message.passphrase);
+          const id = validateString(message.id, 64, 'id', true);
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', false);
+          await deleteCredential(id, passphrase);
           sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -106,7 +119,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'INITIALIZE_VAULT': {
         try {
-          const created = await initializeVault(message.passphrase);
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
+          const created = await initializeVault(passphrase);
           sendResponse({ ok: true, created });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -115,7 +129,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'CHANGE_MASTER_PASSWORD': {
         try {
-          await changeMasterPassword(message.oldPassphrase, message.newPassphrase);
+          const oldPassphrase = validateString(message.oldPassphrase, 1024, 'oldPassphrase', true);
+          const newPassphrase = validateString(message.newPassphrase, 1024, 'newPassphrase', true);
+          await changeMasterPassword(oldPassphrase, newPassphrase);
           sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -144,12 +160,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
           
-          if (!message.passphrase) {
-            sendResponse({ ok: false, error: 'Master password required for import' });
-            return;
-          }
-             
-          const count = await importVaultData(message.data, message.passphrase);
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
+          const cleanData = validateImportData(message.data);
+          
+          const count = await importVaultData(cleanData, passphrase);
           sendResponse({ ok: true, count });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });

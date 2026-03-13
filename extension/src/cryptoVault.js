@@ -1,5 +1,6 @@
 import { getStorage, setStorage } from './storage.js';
 import { loadSettings } from './settings.js';
+import { validateEntry, validateImportData } from './validation.js';
 
 const VAULT_KEY = 'securepassVault';
 const ITERATIONS = 600000;
@@ -211,20 +212,23 @@ async function ensureUnlocked(passphrase, timeoutMinutes) {
 
 function normalizeEntry(partial, existing) {
   const now = new Date().toISOString();
-  const password = partial.password || existing?.password;
-  if (!password) {
+  
+  const rawEntry = {
+    id: partial.id || existing?.id || crypto.randomUUID(),
+    site: partial.site ?? existing?.site ?? '',
+    username: partial.username ?? existing?.username ?? '',
+    notes: partial.notes ?? existing?.notes ?? '',
+    password: partial.password || existing?.password,
+    createdAt: existing?.createdAt || partial.createdAt || now
+  };
+  
+  if (!rawEntry.password) {
     throw new Error('Password is required');
   }
 
-  return {
-    id: partial.id || existing?.id || crypto.randomUUID(),
-    site: (partial.site ?? existing?.site ?? '').trim(),
-    username: (partial.username ?? existing?.username ?? '').trim(),
-    notes: (partial.notes ?? existing?.notes ?? '').trim(),
-    password,
-    createdAt: existing?.createdAt || partial.createdAt || now,
-    updatedAt: now
-  };
+  const cleanEntry = validateEntry(rawEntry, false);
+  cleanEntry.updatedAt = now;
+  return cleanEntry;
 }
 
 async function writeVault(data, passphrase) {
@@ -447,26 +451,14 @@ export async function listCredentials() {
 }
 
 export async function importVaultData(data, passphrase) {
-  console.log('Importing vault data:', data);
-  if (!data || typeof data !== 'object') {
-    throw new Error('Invalid vault data format: not an object');
-  }
-  
-  let entries = data.entries;
-  if (!entries && Array.isArray(data)) {
-    entries = data;
-  }
-  
-  if (!Array.isArray(entries)) {
-    throw new Error('Invalid vault data format: missing entries array');
-  }
+  // Use the new proper validation here, this logic works along with the upstream check.
+  const cleanData = validateImportData(data);
+  const newEntries = cleanData.entries;
   
   const settings = await loadSettings();
   const timeout = settings.vaultTimeout || 15;
   
   await ensureUnlocked(passphrase, timeout);
-  
-  const newEntries = entries.map(entry => normalizeEntry(entry));
   
   // Load existing data to append to
   // ensureUnlocked might have restored it, or we use passphrase

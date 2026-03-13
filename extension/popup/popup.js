@@ -532,7 +532,17 @@ function renderVaultEntries() {
       row.className = 'vault-row';
       const username = document.createElement('div');
       username.className = 'vault-username';
-      username.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="user-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> <span>${entry.username}</span>`;
+      
+      const userSVG = document.createElement('div');
+      userSVG.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="user-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+      
+      const userSpan = document.createElement('span');
+      userSpan.textContent = entry.username;
+      
+      username.appendChild(userSVG.firstChild);
+      username.appendChild(document.createTextNode(' '));
+      username.appendChild(userSpan);
+      
       row.appendChild(username);
       item.appendChild(row);
     }
