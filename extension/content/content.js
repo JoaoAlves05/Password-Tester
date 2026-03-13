@@ -185,13 +185,15 @@
     const hibpBtn = panel.querySelector('.securepass-hibp');
 
     chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, response => {
+      if (chrome.runtime.lastError) return;
       if (response && response.ok && response.unlocked && response.entries) {
         const host = window.location.hostname;
         const matches = response.entries.filter(e => {
           try {
-             return new URL(e.site).hostname.includes(host) || host.includes(new URL(e.site).hostname);
+             const savedHost = new URL(e.site).hostname;
+             return savedHost === host || host.endsWith('.' + savedHost) || savedHost.endsWith('.' + host);
           } catch {
-             return e.site.includes(host) || host.includes(e.site);
+             return e.site === host || host.endsWith('.' + e.site) || e.site.endsWith('.' + host);
           }
         });
 
@@ -268,7 +270,10 @@
     generateBtn.addEventListener('click', async () => {
       generateBtn.disabled = true;
       const response = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ type: 'GENERATE_PASSWORD', constraints }, resolve);
+        chrome.runtime.sendMessage({ type: 'GENERATE_PASSWORD', constraints }, res => {
+          if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
+          resolve(res);
+        });
       });
       generateBtn.disabled = false;
       if (!response || !response.ok) {
@@ -285,7 +290,10 @@
       hibpBtn.disabled = true;
       statusEl.textContent = 'Checking HIBP…';
       const response = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ type: 'HIBP_CHECK', password: field.value }, resolve);
+        chrome.runtime.sendMessage({ type: 'HIBP_CHECK', password: field.value }, res => {
+          if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
+          resolve(res);
+        });
       });
       hibpBtn.disabled = false;
       if (!response || !response.ok) {

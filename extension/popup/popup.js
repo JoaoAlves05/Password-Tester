@@ -337,6 +337,9 @@ function closeSettingsPanel() {
 async function sendMessage(type, payload = {}) {
   return new Promise(resolve => {
     chrome.runtime.sendMessage({ type, ...payload }, response => {
+      if (chrome.runtime.lastError) {
+        return resolve({ ok: false, error: chrome.runtime.lastError.message });
+      }
       resolve(response || { ok: false, error: 'No response from background.' });
     });
   });

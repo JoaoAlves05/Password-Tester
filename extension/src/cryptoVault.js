@@ -4,6 +4,7 @@ import { validateEntry, validateImportData } from './validation.js';
 
 const VAULT_KEY = 'securepassVault';
 const ITERATIONS = 600000;
+const CHUNK_SIZE = 7000;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const STORAGE_PREFERENCE = ['sync', 'local'];
@@ -12,6 +13,9 @@ const ALARM_NAME = 'vaultAutoLock';
 let cache = {
   data: null
 };
+
+let bruteForceAttempts = 0;
+let lockoutUntil = 0;
 
 function bufferToBase64(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)));
@@ -88,30 +92,99 @@ async function getDB() {
 }
 
 async function loadVaultRecord() {
-  try {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('vault', 'readonly');
-      const store = tx.objectStore('vault');
-      const request = store.get(VAULT_KEY);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
+  const settings = await loadSettings();
+  if (settings.useSync) {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(null, items => {
+        if (chrome.runtime.lastError) return resolve(null);
+        if (items[`${VAULT_KEY}_manifest`]) {
+          try {
+            const manifest = items[`${VAULT_KEY}_manifest`];
+            let fullString = '';
+            for (let i = 0; i < manifest.chunks; i++) {
+              if (items[`${VAULT_KEY}_chunk_${i}`] === undefined) {
+                return resolve(null); // corrupted
+              }
+              fullString += items[`${VAULT_KEY}_chunk_${i}`];
+            }
+            resolve(JSON.parse(fullString));
+          } catch (e) {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      });
     });
-  } catch (error) {
-    console.error('Failed to load vault from IndexedDB:', error);
-    return null;
+  } else {
+    try {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('vault', 'readonly');
+        const store = tx.objectStore('vault');
+        const request = store.get(VAULT_KEY);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.error('Failed to load vault from IndexedDB:', error);
+      return null;
+    }
   }
 }
 
 async function saveVaultRecord(record) {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('vault', 'readwrite');
-    const store = tx.objectStore('vault');
-    const request = store.put(record, VAULT_KEY);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const settings = await loadSettings();
+  if (settings.useSync) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.get(`${VAULT_KEY}_manifest`, (items) => {
+        const oldManifest = items[`${VAULT_KEY}_manifest`];
+        const oldChunksCount = oldManifest ? oldManifest.chunks : 0;
+        
+        const serialized = JSON.stringify(record);
+        const chunkCount = Math.ceil(serialized.length / CHUNK_SIZE);
+        const payload = {
+          [`${VAULT_KEY}_manifest`]: { chunks: chunkCount, updatedAt: Date.now() }
+        };
+        
+        let chunkIdx = 0;
+        for (let i = 0; i < serialized.length; i += CHUNK_SIZE) {
+          payload[`${VAULT_KEY}_chunk_${chunkIdx}`] = serialized.substring(i, i + CHUNK_SIZE);
+          chunkIdx++;
+        }
+        
+        const keysToRemove = [];
+        for (let i = chunkIdx; i < oldChunksCount; i++) {
+           keysToRemove.push(`${VAULT_KEY}_chunk_${i}`);
+        }
+        
+        const doSet = () => {
+          chrome.storage.sync.set(payload, () => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            resolve();
+          });
+        };
+        
+        if (keysToRemove.length > 0) {
+          chrome.storage.sync.remove(keysToRemove, () => {
+             if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+             doSet();
+          });
+        } else {
+          doSet();
+        }
+      });
+    });
+  } else {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('vault', 'readwrite');
+      const store = tx.objectStore('vault');
+      const request = store.put(record, VAULT_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
 }
 
 // --- Persistence & Auto-Lock Logic ---
@@ -286,6 +359,11 @@ export async function initializeVault(passphrase) {
 }
 
 export async function unlockVault(passphrase, timeoutMinutes = 15) {
+  if (Date.now() < lockoutUntil) {
+    const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+    throw new Error(`Vault locked due to too many failed attempts. Try again in ${remaining} seconds.`);
+  }
+
   const record = await loadVaultRecord();
   if (!record) {
     await initializeVault(passphrase);
@@ -294,7 +372,17 @@ export async function unlockVault(passphrase, timeoutMinutes = 15) {
   let data;
   try {
     data = await decryptData(record, passphrase);
+    
+    // Reset brute-force triggers on success
+    bruteForceAttempts = 0;
+    lockoutUntil = 0;
   } catch (error) {
+    bruteForceAttempts++;
+    if (bruteForceAttempts >= 5) {
+      lockoutUntil = Date.now() + (30 * 1000); // 30 sec lockout
+      bruteForceAttempts = 0;
+      throw new Error('Invalid master password. Vault locked for 30 seconds.');
+    }
     throw new Error('Invalid master password');
   }
   cache.data = data;
@@ -315,6 +403,14 @@ export async function unlockVault(passphrase, timeoutMinutes = 15) {
 }
 
 export async function lockVault() {
+  if (cache.data && cache.data.entries) {
+    for (let i = 0; i < cache.data.entries.length; i++) {
+        const entry = cache.data.entries[i];
+        entry.password = 0;
+        entry.username = 0;
+        entry.notes = 0;
+    }
+  }
   cache.data = null;
   
   try {

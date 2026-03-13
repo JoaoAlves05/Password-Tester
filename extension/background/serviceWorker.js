@@ -236,3 +236,11 @@ async function ensureOffscreenDocument() {
     justification: 'Clear clipboard after timeout'
   });
 }
+
+// --- System Idle Auto-Lock ---
+
+chrome.idle.onStateChanged.addListener((newState) => {
+  if (newState === 'locked' || newState === 'idle') {
+    lockVault();
+  }
+});
