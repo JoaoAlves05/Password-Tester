@@ -27,7 +27,7 @@ export function analyzeFormContext(field) {
     }
     if (!usernameField && textFields.length > 0) usernameField = textFields[0];
 
-    const formAction = (form.action || '').toLowerCase();
+    const formAction = (form.getAttribute('action') || '').toLowerCase();
     const formText = form.innerText.toLowerCase();
     
     const isRegister = confirmField || passwordFields.length > 1 || 
