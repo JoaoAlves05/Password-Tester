@@ -3,7 +3,7 @@
 
   const shadowHost = document.createElement('div');
   shadowHost.id = 'securepass-extension-root';
-  shadowHost.style.cssText = 'position: fixed; top: 0; left: 0; width: 0; height: 0; pointer-events: none; z-index: 2147483647; overflow: visible;';
+  shadowHost.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; overflow: visible;';
   document.body.appendChild(shadowHost);
   const shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
 
@@ -963,7 +963,9 @@
 
     const outsideHandler = event => {
       const path = event.composedPath();
-      if (path.includes(panel) || path.includes(button)) return;
+      // With mode:'closed', path from document stops at shadowHost — panel/button are hidden.
+      // So we must also check for shadowHost in the path.
+      if (path.includes(panel) || path.includes(button) || path.includes(shadowHost)) return;
       cleanup();
     };
     document.addEventListener('mousedown', outsideHandler, true);

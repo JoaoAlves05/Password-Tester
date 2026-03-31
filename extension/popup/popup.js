@@ -880,9 +880,21 @@ async function loadVaultStatus() {
   if (!response?.ok) return;
   state.vaultInitialized = response.status?.initialized ?? false;
   if (response.status?.unlocked) {
-    await lockVault();
+    // Vault is already unlocked in the service worker — restore state in the popup
+    state.vaultUnlocked = true;
+    // Recover the passphrase from session storage so operations that need it work
+    try {
+      const session = await chrome.storage.session.get('vaultPassphrase');
+      if (session.vaultPassphrase) {
+        state.passphrase = session.vaultPassphrase;
+      }
+    } catch {}
+    renderVaultState();
+    await refreshVaultEntries();
+    resetInactivityTimer();
   } else {
     state.vaultUnlocked = false;
+    state.passphrase = null;
     renderVaultState();
   }
 }
@@ -1472,7 +1484,6 @@ async function initialise() {
   lockVaultBtn.setAttribute('aria-label', 'Lock vault');
   attachEventListeners();
   setupPasswordToggles();
-  await loadVaultStatus();
   await loadVaultStatus();
   setView('tester');
 
