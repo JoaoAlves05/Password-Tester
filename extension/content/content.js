@@ -851,16 +851,24 @@
       overlay.className = 'securepass-auth-overlay';
 
       // Build biometric button HTML only if it might be available
+      // Build biometric button HTML only if it might be available
       const bioHtml = `
-        <div class="securepass-auth-divider">ou</div>
-        <button type="button" id="sp-bio-btn" class="securepass-btn" style="width:100%;gap:8px;" tabindex="0">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v1H9v-1c0-1.657 1.343-3 3-3z"/>
-            <rect x="3" y="13" width="18" height="8" rx="2"/>
-            <circle cx="12" cy="8" r="5" stroke-dasharray="3 2"/>
-          </svg>
-          Usar biometria / PIN
-        </button>
+        <div id="sp-bio-container" style="display: none; width: 100%; flex-direction: column; gap: 10px; align-items: center;">
+          <button type="button" id="sp-bio-btn" class="securepass-btn" style="width:100%;gap:8px;" tabindex="0">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v1H9v-1c0-1.657 1.343-3 3-3z"/>
+              <rect x="3" y="13" width="18" height="8" rx="2"/>
+              <circle cx="12" cy="8" r="5" stroke-dasharray="3 2"/>
+            </svg>
+            Tentar biometria novamente
+          </button>
+          <button type="button" id="sp-show-manual" class="securepass-btn" style="width:100%;gap:8px;background:transparent;border-color:transparent;color:var(--sp-text-secondary);" tabindex="0">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+            Usar Master Password
+          </button>
+        </div>
       `;
 
       overlay.innerHTML = `
@@ -869,25 +877,29 @@
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+        <svg width="32" height="32" id="sp-auth-icon" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <h4>Confirma a tua identidade</h4>
-        <p>Para preencher a password guardada, <br>autentica-te primeiro.</p>
-        <div class="securepass-auth-input-wrap">
-          <input type="password" class="securepass-auth-input" id="sp-auth-pass"
-            placeholder="Master password" autocomplete="current-password" tabindex="0">
-          <button type="button" class="securepass-icon-btn" id="sp-auth-vis" title="Mostrar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
+        <h4 id="sp-auth-title">Confirma a tua identidade</h4>
+        <div class="securepass-auth-error" id="sp-auth-error" style="margin: 0; text-align: center; width: 100%;"></div>
+        
+        ${bioHtml}
+
+        <div id="sp-manual-container" style="display: flex; flex-direction: column; width: 100%; gap: 12px; align-items: center;">
+          <p style="margin: 0;">Insere a master password.</p>
+          <div class="securepass-auth-input-wrap">
+            <input type="password" class="securepass-auth-input" id="sp-auth-pass"
+              placeholder="Master password" autocomplete="current-password" tabindex="0">
+            <button type="button" class="securepass-icon-btn" id="sp-auth-vis" title="Mostrar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <button type="button" id="sp-auth-confirm" class="securepass-btn primary" style="width:100%;" tabindex="0">
+            Desbloquear e preencher
           </button>
         </div>
-        <button type="button" id="sp-auth-confirm" class="securepass-btn primary" style="width:100%;" tabindex="0">
-          Desbloquear e preencher
-        </button>
-        <div class="securepass-auth-error" id="sp-auth-error"></div>
-        ${bioHtml}
       `;
       panel.style.position = 'fixed';
       panel.appendChild(overlay);
@@ -964,24 +976,39 @@
       setTimeout(() => passInput.focus(), 60);
 
       // Biometric auth
+      const bioContainer = overlay.querySelector('#sp-bio-container');
+      const manualContainer = overlay.querySelector('#sp-manual-container');
+      const showManualBtn = overlay.querySelector('#sp-show-manual');
+
       if (bioBtn) {
-        // Hide bio button until we know it's enabled
-        bioBtn.style.display = 'none';
         chrome.runtime.sendMessage({ type: 'BIOMETRIC_STATUS' }, res => {
-          if (res?.ok && res.enabled) bioBtn.style.display = '';
+          if (res?.ok && res.enabled) {
+            bioContainer.style.display = 'flex';
+            manualContainer.style.display = 'none';
+            // Auto-trigger biometric dialog!
+            setTimeout(() => bioBtn.click(), 100);
+          }
         });
+
+        if (showManualBtn) {
+          showManualBtn.addEventListener('click', () => {
+            bioContainer.style.display = 'none';
+            manualContainer.style.display = 'flex';
+            setTimeout(() => passInput.focus(), 60);
+          });
+        }
 
         bioBtn.addEventListener('click', async () => {
           if (activeBiometricSessionId) return; // already pending
           bioBtn.disabled = true;
-          bioBtn.textContent = 'A aguardar biometria…';
+          bioBtn.innerHTML = `A aguardar biometria...`;
           errorEl.textContent = '';
           const res = await new Promise(r =>
             chrome.runtime.sendMessage({ type: 'BIOMETRIC_AUTH_START', credentialId }, r)
           );
           if (!res?.ok) {
             bioBtn.disabled = false;
-            bioBtn.innerHTML = `🪪 Usar biometria / PIN`;
+            bioBtn.innerHTML = `Tentar biometria novamente`;
             errorEl.textContent = res?.error || 'Erro ao iniciar biometria.';
           } else {
             activeBiometricSessionId = res.sessionId;
@@ -1003,7 +1030,10 @@
         const errorEl = overlay?.querySelector('#sp-auth-error');
         if (errorEl) errorEl.textContent = msg.error || 'Autenticação falhada.';
         const bioBtn = overlay?.querySelector('#sp-bio-btn');
-        if (bioBtn) { bioBtn.disabled = false; bioBtn.textContent = '🪪 Usar biometria / PIN'; }
+        if (bioBtn) { 
+          bioBtn.disabled = false; 
+          bioBtn.innerHTML = `Tentar biometria novamente`; 
+        }
       }
     };
     chrome.runtime.onMessage.addListener(biometricResultListener);

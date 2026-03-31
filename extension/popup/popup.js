@@ -1282,13 +1282,18 @@ function attachEventListeners() {
 
   async function refreshBiometricBtn() {
     if (!biometricSetupBtn) return;
-    // Only show if vault is unlocked (registration requires access to the passphrase)
+    biometricSetupBtn.style.display = '';
+    
+    // Get status even if locked
+    const res = await sendMessage('BIOMETRIC_STATUS');
+    
     if (!state.vaultUnlocked) {
-      biometricSetupBtn.style.display = 'none';
+      biometricBtnLabel.textContent = res?.enabled ? 'Biometric Unlock Active' : 'Set up Biometric Unlock';
+      biometricBtnSub.textContent   = 'Unlock vault first to make changes';
+      biometricSetupBtn.classList.remove('danger');
       return;
     }
-    biometricSetupBtn.style.display = '';
-    const res = await sendMessage('BIOMETRIC_STATUS');
+
     if (res?.enabled) {
       biometricBtnLabel.textContent = 'Disable Biometric Unlock';
       biometricBtnSub.textContent   = res.prfAvailable
