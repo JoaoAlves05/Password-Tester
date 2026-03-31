@@ -378,6 +378,11 @@
       padding: 18px;
       z-index: 10;
       animation: securepass-slide-in 0.2s ease;
+      cursor: grab;
+      user-select: none;
+    }
+    .securepass-auth-overlay:active {
+      cursor: grabbing;
     }
     .securepass-auth-overlay h4 {
       margin: 0;
@@ -886,6 +891,21 @@
       `;
       panel.style.position = 'fixed';
       panel.appendChild(overlay);
+
+      // Make overlay draggable
+      overlay.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        initialTop = rect.top;
+        initialLeft = rect.left;
+        
+        document.addEventListener('mousemove', handleDrag, true);
+        document.addEventListener('mouseup', stopDrag, true);
+      });
+
       positionPanel(panel, field);
 
       const passInput = overlay.querySelector('#sp-auth-pass');
