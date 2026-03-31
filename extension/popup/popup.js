@@ -1,6 +1,10 @@
 import { evaluatePassword } from '../src/passwordStrength.js';
 import { loadSettings, saveSettings } from '../src/settings.js';
 
+function bufferToBase64(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+}
+
 const ICONS = {
   sun:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>',
@@ -1314,24 +1318,56 @@ function attachEventListeners() {
       } else {
         // Setup: vault must be unlocked
         if (!requireUnlockedVault()) return;
-        showToast('Follow the prompt in the new window to register your biometric.', 'info');
-        const res = await sendMessage('BIOMETRIC_REGISTER_START');
-        if (!res?.ok) {
-          showToast(res?.error || 'Could not start biometric setup.', 'error');
-          return;
-        }
-        // Poll until the registration window closes (auth.html sends BIOMETRIC_REGISTER_COMPLETE to SW)
-        // We just wait a moment and then refresh the button state
-        setTimeout(() => refreshBiometricBtn(), 5000);
-        // Also listen for storage changes (biometric key written) to update sooner
-        const storageListener = (changes) => {
-          if (changes.securepassBiometric) {
-            chrome.storage.onChanged.removeListener(storageListener);
-            refreshBiometricBtn();
-            showToast('Biometric unlock configured!', 'success');
+        showToast('Confirma a tua identidade no sistema (Touch ID, PIN, etc.).', 'info');
+        try {
+          const rpId = chrome.runtime.id;
+          const challenge = crypto.getRandomValues(new Uint8Array(32));
+          
+          const credential = await navigator.credentials.create({
+            publicKey: {
+              challenge,
+              rp: { id: rpId, name: 'SecurePass' },
+              user: {
+                id: new TextEncoder().encode('securepass-user'),
+                name: 'SecurePass User',
+                displayName: 'SecurePass',
+              },
+              pubKeyCredParams: [
+                { type: 'public-key', alg: -7 },
+                { type: 'public-key', alg: -257 },
+              ],
+              authenticatorSelection: {
+                authenticatorAttachment: 'platform',
+                userVerification: 'required',
+              },
+              extensions: {
+                prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
+              },
+            },
+          });
+
+          const prfResults = credential.getClientExtensionResults()?.prf?.results;
+          const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
+          
+          const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
+            credentialId: bufferToBase64(credential.rawId),
+            prfOutput,
+            prfAvailable: !!prfOutput
+          });
+
+          if (res?.ok) {
+            showToast('Biometria configurada com sucesso!', 'success');
+            await refreshBiometricBtn();
+          } else {
+            showToast(res?.error || 'Erro ao configurar biometria.', 'error');
           }
-        };
-        chrome.storage.onChanged.addListener(storageListener);
+        } catch (err) {
+          if (err.name === 'NotAllowedError') {
+            showToast('Configuração biométrica cancelada.', 'info');
+          } else {
+            showToast('Erro: ' + err.message, 'error');
+          }
+        }
       }
     });
   }

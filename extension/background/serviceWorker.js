@@ -278,32 +278,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       }
-      case 'BIOMETRIC_REGISTER_START': {
-        // Opens auth.html in 'register' mode. Vault must be unlocked to get passphrase.
-        try {
-          const status = await vaultStatus();
-          if (!status.unlocked) { sendResponse({ ok: false, error: 'Vault must be unlocked to set up biometrics' }); break; }
-          const vaultSession = await chrome.storage.session.get('vaultPassphrase');
-          if (!vaultSession.vaultPassphrase) { sendResponse({ ok: false, error: 'Vault session expired' }); break; }
-
-          const sessionId = crypto.randomUUID();
-          const challenge = bufferToBase64(crypto.getRandomValues(new Uint8Array(32)).buffer);
-          await chrome.storage.session.set({ [`biometric_${sessionId}`]: { challenge, mode: 'register' } });
-
-          const win = await chrome.windows.create({
-            url: chrome.runtime.getURL(`auth/auth.html?sessionId=${sessionId}&mode=register`),
-            type: 'popup', width: 380, height: 300, left: 200, top: 200,
-          });
-          await chrome.storage.session.set({ [`biometric_window_${sessionId}`]: win.id });
-          sendResponse({ ok: true, sessionId });
-        } catch (error) {
-          sendResponse({ ok: false, error: error.message });
-        }
-        break;
-      }
       case 'BIOMETRIC_REGISTER_COMPLETE': {
-        // Called by auth.html after successful credential creation
-        const { sessionId, credentialId, prfOutput, prfAvailable } = message;
+        // Called by popup.js after successful credential creation
+        const { credentialId, prfOutput, prfAvailable } = message;
         try {
           const vaultSession = await chrome.storage.session.get('vaultPassphrase');
           const passphrase = vaultSession.vaultPassphrase;
@@ -312,7 +289,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             encryptedPassphrase = await encryptPassphraseWithPRF(passphrase, prfOutput);
           }
           await saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable);
-          await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
           sendResponse({ ok: true, prfAvailable });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
