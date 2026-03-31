@@ -1,5 +1,38 @@
-.env
-*.db
+# Ambiente Virtual (Dependências do Python)
+.venv/
+venv/
+env/
+
+# Ficheiros de Python e Cache (Testes e Execução)
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Variáveis de Ambiente e Chaves Secretas
+.env
+.env.*
+!.env.example
+
+# Bases de Dados e Registos
 *.log
+*.sqlite3
+*.db
+
+# Frontend / Web / Extensão (JavaScript e Node.js)
+node_modules/
+dist/
+build/
+.npm/
+
+# IDE e Editores de Texto
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema Operativo (Windows e macOS)
+.DS_Store
+Thumbs.db
