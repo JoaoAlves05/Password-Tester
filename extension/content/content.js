@@ -3,36 +3,39 @@
 
   const shadowHost = document.createElement('div');
   shadowHost.id = 'securepass-extension-root';
-  shadowHost.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2147483647; overflow: visible;';
+  shadowHost.style.cssText = 'position: fixed; top: 0; left: 0; width: 0; height: 0; pointer-events: none; z-index: 2147483647; overflow: visible;';
   document.body.appendChild(shadowHost);
   const shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');
   style.textContent = `
+    * { box-sizing: border-box; }
     .securepass-floating {
       pointer-events: auto;
-      position: absolute;
+      position: fixed;
       z-index: 2147483646;
       width: 28px;
       height: 28px;
       border-radius: 8px;
       border: none;
-      background: rgba(37, 99, 235, 0.1);
-      opacity: 0.4;
+      background: rgba(37, 99, 235, 0.15);
+      opacity: 0.5;
       backdrop-filter: blur(4px);
       cursor: pointer;
       display: grid;
       place-items: center;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
     }
     .securepass-floating:hover, .securepass-floating--focused, .securepass-floating--active {
       opacity: 1;
-      background: rgba(37, 99, 235, 0.8);
+      background: rgba(37, 99, 235, 0.85);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
     }
     .securepass-floating svg {
       width: 14px;
       height: 14px;
-      color: #0f172a;
+      color: #3b82f6;
       transition: color 0.2s ease;
     }
     .securepass-floating:hover svg, .securepass-floating--focused svg, .securepass-floating--active svg {
@@ -40,16 +43,16 @@
     }
     .securepass-panel {
       pointer-events: auto;
-      position: absolute;
+      position: fixed;
       z-index: 2147483647;
       width: 320px;
       border-radius: 16px;
       padding: 16px;
-      background: rgba(15, 23, 42, 0.85);
+      background: rgba(15, 23, 42, 0.92);
       color: #f8fafc;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       font-family: 'Inter', system-ui, sans-serif;
       animation: securepass-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       transform-origin: top center;
@@ -117,10 +120,17 @@
       padding-top: 12px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
+    /* ── Action rows ── */
     .securepass-actions {
       display: flex;
-      gap: 8px;
+      flex-direction: column;
+      gap: 6px;
       margin-top: 12px;
+    }
+    .securepass-actions-row {
+      display: flex;
+      gap: 6px;
+      align-items: stretch;
     }
     .securepass-btn {
       flex: 1;
@@ -128,7 +138,7 @@
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.05);
       color: #f8fafc;
-      padding: 6px 8px;
+      padding: 7px 10px;
       font-size: 0.8rem;
       font-weight: 500;
       cursor: pointer;
@@ -137,33 +147,68 @@
       justify-content: center;
       gap: 6px;
       transition: all 0.2s ease;
+      white-space: nowrap;
+      outline: none;
     }
     .securepass-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .securepass-btn:focus-visible {
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
     }
     .securepass-btn.primary {
-      background: rgba(37, 99, 235, 0.8);
+      background: rgba(37, 99, 235, 0.85);
       border-color: transparent;
     }
     .securepass-btn.primary:hover {
       background: rgba(37, 99, 235, 1);
-      box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.45);
+    }
+    /* Options toggle button — sits inline with Generate */
+    .securepass-options-btn {
+      flex: 0 0 auto;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 7px 9px;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      outline: none;
+    }
+    .securepass-options-btn:hover, .securepass-options-btn.open {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #f8fafc;
+    }
+    .securepass-options-btn:focus-visible {
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
     }
     .securepass-icon-btn {
+      flex: 0 0 auto;
       background: none;
       border: none;
       color: #94a3b8;
       cursor: pointer;
-      padding: 4px;
+      padding: 5px;
       border-radius: 6px;
       display: grid;
       place-items: center;
       transition: all 0.15s ease;
+      outline: none;
     }
     .securepass-icon-btn:hover {
       background: rgba(255,255,255,0.1);
       color: #f8fafc;
+    }
+    .securepass-icon-btn:focus-visible {
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
     }
     .securepass-icon-btn svg { width: 14px; height: 14px; }
     .securepass-status {
@@ -187,6 +232,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      outline: none;
     }
     .autofill-btn:hover {
       background: rgba(37, 99, 235, 0.3);
@@ -201,14 +247,16 @@
     }
     .securepass-gen-settings {
       display: none;
-      margin-top: 8px;
-      padding: 8px;
-      background: rgba(0,0,0,0.2);
+      margin-top: 2px;
+      padding: 10px;
+      background: rgba(0,0,0,0.25);
       border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.07);
       font-size: 0.75rem;
     }
     .securepass-gen-settings.open {
       display: block;
+      animation: securepass-slide-in 0.15s ease;
     }
     .securepass-gen-settings label {
       display: flex;
@@ -216,10 +264,15 @@
       gap: 6px;
       margin-bottom: 4px;
       cursor: pointer;
+      color: #cbd5e1;
     }
     .securepass-gen-settings input[type="range"] {
       width: 100%;
       margin: 4px 0 8px 0;
+      accent-color: #3b82f6;
+    }
+    .securepass-gen-settings input[type="checkbox"] {
+      accent-color: #3b82f6;
     }
   `;
   shadowRoot.appendChild(style);
@@ -262,26 +315,35 @@
     const rect = field.getBoundingClientRect();
     if (!rect.width || !rect.height) {
       button.style.opacity = '0';
+      button.style.pointerEvents = 'none';
       return;
     }
-    // positioned inside the input on the right side
-    const top = rect.top + window.scrollY + rect.height / 2 - button.offsetHeight / 2;
-    const left = rect.right + window.scrollX - button.offsetWidth - 8;
+    button.style.opacity = '';
+    button.style.pointerEvents = '';
+    // Use fixed positioning — already fixed in CSS, so top/left are viewport coords
+    const top = rect.top + rect.height / 2 - 14; // 14 = half of 28px button height
+    const left = rect.right - 36; // 36 = button width (28) + 8px margin
     button.style.top = `${Math.max(0, top)}px`;
-    button.style.left = `${left}px`;
+    button.style.left = `${Math.max(0, left)}px`;
   }
 
   function positionPanel(panel, field) {
     const rect = field.getBoundingClientRect();
-    const top = rect.bottom + window.scrollY + 8;
-    let left = rect.left + window.scrollX;
-    
-    // adjust to prevent overflow
+    // Use fixed positioning — top/left are viewport coords directly
+    let top = rect.bottom + 8;
+    let left = rect.left;
+
+    // Clamp right overflow
     if (left + 320 > window.innerWidth) {
-      left = window.innerWidth - 340;
+      left = window.innerWidth - 328;
     }
-    
-    panel.style.top = `${top}px`;
+    // Clamp bottom overflow — if panel would go off screen, show above the field
+    const panelH = panel.offsetHeight || 250;
+    if (top + panelH > window.innerHeight) {
+      top = Math.max(8, rect.top - panelH - 8);
+    }
+
+    panel.style.top = `${Math.max(8, top)}px`;
     panel.style.left = `${Math.max(8, left)}px`;
   }
 
@@ -351,7 +413,6 @@
       </div>
     `;
 
-    let actionsHtml = `<div class="securepass-actions">`;
     const genSettingsHtml = `
       <div class="securepass-gen-settings">
         <label>Length: <span class="gen-len-val">16</span></label>
@@ -365,32 +426,45 @@
       </div>
     `;
 
+    // ── Row 1: Generate + Options toggle ──
+    const generateIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>`;
+    const optionsIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+    const saveIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`;
+    const hibpIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+
+    let actionsHtml = `<div class="securepass-actions">`;
+
     if (!isLogin) {
+      // Row 1: Generate (grows) + Options
       actionsHtml += `
-        <div style="display:flex; flex-direction:column; flex:1; gap:4px;">
-          <div style="display:flex; gap:4px;">
-            <button type="button" class="securepass-btn securepass-generate" tabindex="0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg> Generate</button>
-            <button type="button" class="securepass-icon-btn gen-settings-btn" title="Options" tabindex="0">⚙️</button>
-          </div>
-          ${genSettingsHtml}
+        <div class="securepass-actions-row">
+          <button type="button" class="securepass-btn securepass-generate" tabindex="0">${generateIcon} Generate</button>
+          <button type="button" class="securepass-options-btn gen-settings-btn" title="Generator options" tabindex="0">${optionsIcon} Options</button>
+        </div>
+        ${genSettingsHtml}
+        <div class="securepass-actions-row">
+          <button type="button" class="securepass-btn securepass-save primary" tabindex="0">${saveIcon} Save credential</button>
         </div>
       `;
-      actionsHtml += `<button type="button" class="securepass-btn securepass-save primary" tabindex="0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save</button>`;
     } else {
+      // Login: just Generate + Options
       actionsHtml += `
-        <div style="display:flex; flex-direction:column; flex:1; gap:4px;">
-          <div style="display:flex; gap:4px;">
-            <button type="button" class="securepass-btn securepass-generate" tabindex="0">Generate</button>
-            <button type="button" class="securepass-icon-btn gen-settings-btn" title="Options" tabindex="0">⚙️</button>
-          </div>
-          ${genSettingsHtml}
+        <div class="securepass-actions-row">
+          <button type="button" class="securepass-btn securepass-generate" tabindex="0">${generateIcon} Generate</button>
+          <button type="button" class="securepass-options-btn gen-settings-btn" title="Generator options" tabindex="0">${optionsIcon} Options</button>
         </div>
+        ${genSettingsHtml}
       `;
     }
+
+    // HIBP row — always shown
+    actionsHtml += `
+      <div class="securepass-actions-row">
+        <button type="button" class="securepass-btn securepass-hibp" tabindex="0">${hibpIcon} Check if Pwned (HIBP)</button>
+      </div>
+    `;
+
     actionsHtml += `</div>`;
-    
-    // Always HIBP below
-    actionsHtml += `<div class="securepass-actions"><button type="button" class="securepass-btn securepass-hibp" style="font-size: 0.7rem; padding: 4px;">Check if Pwned (HIBP)</button></div>`;
 
     contentHtml += actionsHtml;
     contentHtml += `<div class="securepass-status"></div>`;
@@ -417,7 +491,8 @@
 
     if (genSettingsBtn && genSettingsPanel) {
       genSettingsBtn.addEventListener('click', () => {
-        genSettingsPanel.classList.toggle('open');
+        const isOpen = genSettingsPanel.classList.toggle('open');
+        genSettingsBtn.classList.toggle('open', isOpen);
         positionPanel(panel, field);
       });
       lenInput.addEventListener('input', e => {
