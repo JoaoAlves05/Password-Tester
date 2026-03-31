@@ -1259,6 +1259,76 @@ function attachEventListeners() {
     });
   }
 
+  // Biometric Unlock Setup / Disable
+  const biometricSetupBtn = document.getElementById('biometricSetupBtn');
+  const biometricBtnLabel = document.getElementById('biometricBtnLabel');
+  const biometricBtnSub   = document.getElementById('biometricBtnSub');
+
+  async function refreshBiometricBtn() {
+    if (!biometricSetupBtn) return;
+    // Only show if vault is unlocked (registration requires access to the passphrase)
+    if (!state.vaultUnlocked) {
+      biometricSetupBtn.style.display = 'none';
+      return;
+    }
+    biometricSetupBtn.style.display = '';
+    const res = await sendMessage('BIOMETRIC_STATUS');
+    if (res?.enabled) {
+      biometricBtnLabel.textContent = 'Disable Biometric Unlock';
+      biometricBtnSub.textContent   = res.prfAvailable
+        ? 'Active · PRF encryption enabled'
+        : 'Active · Session-based (re-enter password after restart)';
+      biometricSetupBtn.classList.add('danger');
+    } else {
+      biometricBtnLabel.textContent = 'Set up Biometric Unlock';
+      biometricBtnSub.textContent   = 'Use fingerprint, Face ID or device PIN';
+      biometricSetupBtn.classList.remove('danger');
+    }
+  }
+
+  if (biometricSetupBtn) {
+    biometricSetupBtn.addEventListener('click', async () => {
+      const statusRes = await sendMessage('BIOMETRIC_STATUS');
+      if (statusRes?.enabled) {
+        // Disable
+        if (!confirm('Disable biometric unlock? You will need to enter your master password each time.')) return;
+        const disableRes = await sendMessage('DISABLE_BIOMETRIC');
+        if (disableRes?.ok) {
+          showToast('Biometric unlock disabled.', 'success');
+          await refreshBiometricBtn();
+        } else {
+          showToast('Could not disable biometrics.', 'error');
+        }
+      } else {
+        // Setup: vault must be unlocked
+        if (!requireUnlockedVault()) return;
+        showToast('Follow the prompt in the new window to register your biometric.', 'info');
+        const res = await sendMessage('BIOMETRIC_REGISTER_START');
+        if (!res?.ok) {
+          showToast(res?.error || 'Could not start biometric setup.', 'error');
+          return;
+        }
+        // Poll until the registration window closes (auth.html sends BIOMETRIC_REGISTER_COMPLETE to SW)
+        // We just wait a moment and then refresh the button state
+        setTimeout(() => refreshBiometricBtn(), 5000);
+        // Also listen for storage changes (biometric key written) to update sooner
+        const storageListener = (changes) => {
+          if (changes.securepassBiometric) {
+            chrome.storage.onChanged.removeListener(storageListener);
+            refreshBiometricBtn();
+            showToast('Biometric unlock configured!', 'success');
+          }
+        };
+        chrome.storage.onChanged.addListener(storageListener);
+      }
+    });
+  }
+
+  // Refresh biometric button state when settings panel opens
+  const origOpenSettings = openSettingsPanel;
+  // Wrap openSettingsPanel to also refresh biometric state
+  openSettingsBtn?.addEventListener('click', () => refreshBiometricBtn());
+
   // Reset Settings
   const resetSettingsBtn = document.getElementById('resetSettings');
 

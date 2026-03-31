@@ -21,7 +21,8 @@
     "offscreen",
     "clipboardWrite",
     "idle",
-    "notifications"
+    "notifications",
+    "windows"
   ],
   "host_permissions": [
     "https://api.pwnedpasswords.com/*"
@@ -49,7 +50,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; connect-src 'self' https://api.pwnedpasswords.com; style-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
-
+    "extension_pages": "default-src 'self'; connect-src 'self' https://api.pwnedpasswords.com; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
   }
 }

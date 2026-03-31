@@ -274,6 +274,137 @@
     .securepass-gen-settings input[type="checkbox"] {
       accent-color: #3b82f6;
     }
+    /* ── Credential Stubs ── */
+    .securepass-stub-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .securepass-stub-label {
+      font-size: 0.68rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .securepass-stub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      background: rgba(37,99,235,0.08);
+      border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 9px;
+      padding: 7px 10px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      outline: none;
+    }
+    .securepass-stub:hover { background: rgba(37,99,235,0.18); border-color: rgba(37,99,235,0.4); }
+    .securepass-stub:focus-visible { box-shadow: 0 0 0 2px rgba(59,130,246,0.5); }
+    .securepass-stub-avatar {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: #1e293b;
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .securepass-stub-info { flex: 1; text-align: left; min-width: 0; }
+    .securepass-stub-user { font-weight: 600; font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .securepass-stub-site { font-size: 0.65rem; color: #64748b; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .securepass-stub-action { color: #3b82f6; flex-shrink: 0; }
+    /* ── Inline Auth Overlay ── */
+    .securepass-auth-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      background: rgba(10,18,35,0.97);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 20px;
+      z-index: 10;
+      animation: securepass-slide-in 0.2s ease;
+    }
+    .securepass-auth-overlay h4 {
+      margin: 0;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      text-align: center;
+    }
+    .securepass-auth-overlay p {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin: 0;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .securepass-auth-input-wrap {
+      width: 100%;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .securepass-auth-input {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: #f8fafc;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s ease;
+    }
+    .securepass-auth-input:focus { border-color: rgba(59,130,246,0.6); }
+    .securepass-auth-input.shake {
+      animation: sp-shake 0.35s ease;
+      border-color: rgba(239,68,68,0.6);
+    }
+    @keyframes sp-shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-5px); }
+      60%     { transform: translateX(5px); }
+    }
+    .securepass-auth-error {
+      font-size: 0.72rem;
+      color: #f87171;
+      text-align: center;
+      min-height: 14px;
+    }
+    .securepass-auth-divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      color: #475569;
+    }
+    .securepass-auth-divider::before,.securepass-auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+    .securepass-auth-close {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: none;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: grid; place-items: center;
+      transition: color 0.15s ease;
+    }
+    .securepass-auth-close:hover { color: #94a3b8; }
   `;
   shadowRoot.appendChild(style);
 
@@ -536,92 +667,280 @@
       });
     }
 
-    // Autofill section
-    chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, response => {
-      if (chrome.runtime.lastError) return;
-      if (response && response.ok && response.unlocked && response.entries) {
-        const host = window.location.hostname;
-        const matches = response.entries.filter(e => {
-          try {
-             const savedHost = new URL(e.site).hostname;
-             return savedHost === host || host.endsWith('.' + savedHost) || savedHost.endsWith('.' + host);
-          } catch {
-             return e.site === host || host.endsWith('.' + e.site) || e.site.endsWith('.' + host);
+    // ─── Credential Stubs (always visible, even when vault is locked) ───
+    const host = window.location.hostname;
+    let vaultUnlocked = false;
+    let activeBiometricSessionId = null;
+
+    // Helper: fill the form with a fully-decrypted credential
+    function fillCredential(m) {
+      field.value = m.password;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      let userFilled = false;
+      if (m.username) {
+        if (constraints.usernameField) {
+          constraints.usernameField.value = m.username;
+          constraints.usernameField.dispatchEvent(new Event('input', { bubbles: true }));
+          userFilled = true;
+        }
+        if (!userFilled) {
+          const form = field.form || field.closest('form');
+          const userField = form
+            ? Array.from(form.elements).find(el =>
+                el !== field && el.tagName === 'INPUT' &&
+                (el.type === 'text' || el.type === 'email' ||
+                  el.name?.toLowerCase().includes('user') ||
+                  el.name?.toLowerCase().includes('email'))
+              )
+            : document.querySelector('input[type="text"],input[type="email"]');
+          if (userField) {
+            userField.value = m.username;
+            userField.dispatchEvent(new Event('input', { bubbles: true }));
           }
+        }
+      }
+      statusEl.textContent = 'Preenchido!';
+      statusEl.style.color = '#22c55e';
+      setTimeout(() => {
+        cleanup();
+        if (AUTO_SUBMIT_ENABLED && field.form) {
+          try { field.form.requestSubmit(); } catch { try { field.form.submit(); } catch {} }
+        }
+      }, 800);
+    }
+
+    // Helper: show inline auth overlay (master password + biometric)
+    function showAuthOverlay(credentialId) {
+      // Remove any existing overlay
+      const existing = panel.querySelector('.securepass-auth-overlay');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'securepass-auth-overlay';
+
+      // Build biometric button HTML only if it might be available
+      const bioHtml = `
+        <div class="securepass-auth-divider">ou</div>
+        <button type="button" id="sp-bio-btn" class="securepass-btn" style="width:100%;gap:8px;" tabindex="0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v1H9v-1c0-1.657 1.343-3 3-3z"/>
+            <rect x="3" y="13" width="18" height="8" rx="2"/>
+            <circle cx="12" cy="8" r="5" stroke-dasharray="3 2"/>
+          </svg>
+          Usar biometria / PIN
+        </button>
+      `;
+
+      overlay.innerHTML = `
+        <button type="button" class="securepass-auth-close" id="sp-auth-close" title="Fechar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h4>Confirma a tua identidade</h4>
+        <p>Para preencher a password guardada, <br>autentica-te primeiro.</p>
+        <div class="securepass-auth-input-wrap">
+          <input type="password" class="securepass-auth-input" id="sp-auth-pass"
+            placeholder="Master password" autocomplete="current-password" tabindex="0">
+          <button type="button" class="securepass-icon-btn" id="sp-auth-vis" title="Mostrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <button type="button" id="sp-auth-confirm" class="securepass-btn primary" style="width:100%;" tabindex="0">
+          Desbloquear e preencher
+        </button>
+        <div class="securepass-auth-error" id="sp-auth-error"></div>
+        ${bioHtml}
+      `;
+      panel.style.position = 'fixed';
+      panel.appendChild(overlay);
+      positionPanel(panel, field);
+
+      const passInput = overlay.querySelector('#sp-auth-pass');
+      const confirmBtn = overlay.querySelector('#sp-auth-confirm');
+      const errorEl   = overlay.querySelector('#sp-auth-error');
+      const visBtn    = overlay.querySelector('#sp-auth-vis');
+      const closeBtn  = overlay.querySelector('#sp-auth-close');
+      const bioBtn    = overlay.querySelector('#sp-bio-btn');
+
+      closeBtn.addEventListener('click', () => overlay.remove());
+      visBtn.addEventListener('click', () => {
+        passInput.type = passInput.type === 'password' ? 'text' : 'password';
+      });
+
+      let attempts = 0;
+      async function attemptUnlock() {
+        const pass = passInput.value.trim();
+        if (!pass) { passInput.classList.add('shake'); setTimeout(() => passInput.classList.remove('shake'), 400); return; }
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'A verificar…';
+        errorEl.textContent = '';
+
+        const res = await new Promise(r =>
+          chrome.runtime.sendMessage({ type: 'UNLOCK_AND_FILL', passphrase: pass, credentialId }, r)
+        );
+
+        if (res?.ok && res.entry) {
+          overlay.remove();
+          fillCredential(res.entry);
+        } else {
+          attempts++;
+          passInput.value = '';
+          passInput.classList.add('shake');
+          setTimeout(() => passInput.classList.remove('shake'), 400);
+          errorEl.textContent = res?.error || 'Password incorreta.';
+          if (attempts >= 3) {
+            confirmBtn.disabled = true;
+            if (bioBtn) bioBtn.disabled = true;
+            errorEl.textContent = 'Demasiadas tentativas. Aguarda 30s.';
+            setTimeout(() => {
+              confirmBtn.disabled = false;
+              if (bioBtn) bioBtn.disabled = false;
+              attempts = 0;
+              errorEl.textContent = '';
+              confirmBtn.textContent = 'Desbloquear e preencher';
+            }, 30000);
+          } else {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Desbloquear e preencher';
+          }
+        }
+      }
+
+      confirmBtn.addEventListener('click', attemptUnlock);
+      passInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptUnlock(); });
+      setTimeout(() => passInput.focus(), 60);
+
+      // Biometric auth
+      if (bioBtn) {
+        // Hide bio button until we know it's enabled
+        bioBtn.style.display = 'none';
+        chrome.runtime.sendMessage({ type: 'BIOMETRIC_STATUS' }, res => {
+          if (res?.ok && res.enabled) bioBtn.style.display = '';
         });
 
-        if (matches.length > 0) {
-          const section = panel.querySelector('.securepass-autofill-section');
-          const list = section.querySelector('.autofill-list');
-          section.style.display = 'block';
-          matches.forEach(m => {
-             const btn = document.createElement('button');
-             btn.type = 'button';
-             btn.className = 'autofill-btn';
-             btn.innerHTML = `
-               <div class="autofill-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
-               <div>
-                  <div style="font-weight:600;">${m.username || 'No username'}</div>
-                  <div style="font-size:0.65rem; color:#94a3b8; margin-top:2px;">${host}</div>
-               </div>
-             `;
-             
-             btn.addEventListener('click', () => {
-                field.value = m.password;
-                field.dispatchEvent(new Event('input', { bubbles: true }));
-                
-                let userFilled = false;
-                if (m.username) {
-                  if (constraints.usernameField) {
-                     constraints.usernameField.value = m.username;
-                     constraints.usernameField.dispatchEvent(new Event('input', { bubbles: true }));
-                     userFilled = true;
-                  }
-                  // Backup heuristic
-                  if (!userFilled) {
-                    const form = field.form || field.closest('form');
-                    if (form) {
-                      const userField = Array.from(form.elements).find(el => {
-                        if (el === field) return false;
-                        return el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'email' || el.name.toLowerCase().includes('user') || el.name.toLowerCase().includes('email'));
-                      }) || document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"]');
-                      if (userField) {
-                        userField.value = m.username;
-                        userField.dispatchEvent(new Event('input', { bubbles: true }));
-                      }
-                    }
-                  }
-                }
-                statusEl.textContent = 'Autofilled successfully!';
-                statusEl.style.color = '#22c55e';
-                setTimeout(() => {
-                  cleanup();
-                  if (AUTO_SUBMIT_ENABLED && field.form) {
-                    try {
-                      field.form.requestSubmit();
-                    } catch (e) {
-                      try { field.form.submit(); } catch (e2) {}
-                    }
-                  }
-                }, 1000);
-             });
-             list.appendChild(btn);
-          });
-          setTimeout(() => positionPanel(panel, field), 10);
-        } else if (isLogin) {
-          statusEl.textContent = 'No saved passwords for this site.';
-        }
-      } else if (isLogin) {
-         statusEl.innerHTML = 'Vault is locked. <a href="#" style="color:#60a5fa" id="open-ext-login">Unlock</a>';
-         const link = statusEl.querySelector('#open-ext-login');
-         if(link) {
-           link.addEventListener('click', (e) => {
-             e.preventDefault();
-             statusEl.textContent = 'Please open the extension from toolbar.';
-           });
-         }
+        bioBtn.addEventListener('click', async () => {
+          if (activeBiometricSessionId) return; // already pending
+          bioBtn.disabled = true;
+          bioBtn.textContent = 'A aguardar biometria…';
+          errorEl.textContent = '';
+          const res = await new Promise(r =>
+            chrome.runtime.sendMessage({ type: 'BIOMETRIC_AUTH_START', credentialId }, r)
+          );
+          if (!res?.ok) {
+            bioBtn.disabled = false;
+            bioBtn.innerHTML = `🪪 Usar biometria / PIN`;
+            errorEl.textContent = res?.error || 'Erro ao iniciar biometria.';
+          } else {
+            activeBiometricSessionId = res.sessionId;
+          }
+        });
       }
+    }
+
+    // Listen for biometric fill result from background
+    const biometricResultListener = (msg) => {
+      if (msg.type !== 'BIOMETRIC_FILL_RESULT') return;
+      if (activeBiometricSessionId && msg.sessionId !== activeBiometricSessionId) return;
+      activeBiometricSessionId = null;
+      const overlay = panel.querySelector('.securepass-auth-overlay');
+      if (msg.entry) {
+        if (overlay) overlay.remove();
+        fillCredential(msg.entry);
+      } else {
+        const errorEl = overlay?.querySelector('#sp-auth-error');
+        if (errorEl) errorEl.textContent = msg.error || 'Autenticação falhada.';
+        const bioBtn = overlay?.querySelector('#sp-bio-btn');
+        if (bioBtn) { bioBtn.disabled = false; bioBtn.textContent = '🪪 Usar biometria / PIN'; }
+      }
+    };
+    chrome.runtime.onMessage.addListener(biometricResultListener);
+
+    // Render stub list from metadata (works even when vault is locked)
+    function renderStubs(metaList, unlockedEntries) {
+      const section = panel.querySelector('.securepass-autofill-section');
+      const list    = section.querySelector('.autofill-list');
+      list.innerHTML = '';
+
+      const matches = metaList.filter(m => {
+        try {
+          const mHost = new URL(m.site.startsWith('http') ? m.site : `https://${m.site}`).hostname;
+          return mHost === host || host.endsWith('.' + mHost) || mHost.endsWith('.' + host);
+        } catch { return m.site === host || host.endsWith('.' + m.site) || m.site.endsWith('.' + host); }
+      });
+
+      if (!matches.length) {
+        if (isLogin) statusEl.textContent = 'Nenhuma password guardada para este site.';
+        return;
+      }
+
+      section.style.display = 'block';
+      matches.forEach(m => {
+        const stub = document.createElement('button');
+        stub.type = 'button';
+        stub.className = 'securepass-stub';
+        stub.tabIndex = 0;
+        stub.innerHTML = `
+          <div class="securepass-stub-avatar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div class="securepass-stub-info">
+            <div class="securepass-stub-user">${m.username || 'Sem utilizador'}</div>
+            <div class="securepass-stub-site">${host}</div>
+          </div>
+          <span class="securepass-stub-action">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              ${vaultUnlocked
+                ? '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'
+                : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+              }
+            </svg>
+          </span>
+        `;
+        stub.addEventListener('click', () => {
+          if (vaultUnlocked) {
+            // Vault already open: fetch directly
+            const fullEntry = unlockedEntries?.find(e => e.id === m.id);
+            if (fullEntry) { fillCredential(fullEntry); return; }
+            // Shouldn't happen, but fallback
+            chrome.runtime.sendMessage({ type: 'GET_CREDENTIAL', credentialId: m.id }, res => {
+              if (res?.ok && res.entry) fillCredential(res.entry);
+              else showAuthOverlay(m.id);
+            });
+          } else {
+            showAuthOverlay(m.id);
+          }
+        });
+        list.appendChild(stub);
+      });
+      setTimeout(() => positionPanel(panel, field), 10);
+    }
+
+    // 1. Fetch metadata immediately (no vault needed)
+    chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS_META' }, metaRes => {
+      if (chrome.runtime.lastError || !metaRes?.ok) return;
+      const meta = metaRes.meta || [];
+      // Render stubs right away (vault may still be locked)
+      renderStubs(meta, null);
+
+      // 2. In parallel: check vault status + get full entries if unlocked
+      chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, fullRes => {
+        if (chrome.runtime.lastError || !fullRes?.ok) return;
+        vaultUnlocked = fullRes.unlocked;
+        if (fullRes.unlocked && fullRes.entries?.length) {
+          // Re-render stubs with unlock icons replaced by checkmarks
+          renderStubs(meta, fullRes.entries);
+        }
+      });
     });
+
 
     const ro = new ResizeObserver(() => positionPanel(panel, field));
     ro.observe(field);
@@ -798,6 +1117,7 @@
       window.removeEventListener('resize', scrollHandler);
       field.removeEventListener('input', inputHandler);
       field.removeEventListener('keydown', fieldKeydown);
+      chrome.runtime.onMessage.removeListener(biometricResultListener);
       ro.disconnect();
       panel.remove();
       button.classList.remove('securepass-floating--active');

@@ -2,17 +2,18 @@ import { getStorage, setStorage } from './storage.js';
 import { loadSettings } from './settings.js';
 import { validateEntry, validateImportData } from './validation.js';
 
-const VAULT_KEY = 'securepassVault';
-const ITERATIONS = 600000;
-const CHUNK_SIZE = 7000;
+const VAULT_KEY    = 'securepassVault';
+const META_KEY     = 'securepassMeta';
+const BIOMETRIC_KEY = 'securepassBiometric';
+const ITERATIONS   = 600000;
+const CHUNK_SIZE   = 7000;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const STORAGE_PREFERENCE = ['sync', 'local'];
 const ALARM_NAME = 'vaultAutoLock';
+const PRF_EVAL_LABEL = 'securepass-master-key-v1';
 
-let cache = {
-  data: null
-};
+let cache = { data: null };
 
 let bruteForceAttempts = 0;
 let lockoutUntil = 0;
@@ -428,13 +429,7 @@ export async function storeCredential(entry, passphrase) {
   const normalized = normalizeEntry(entry);
   data.entries = data.entries || [];
   data.entries.push(normalized);
-  
-  // If passphrase not provided (e.g. from popup where we rely on session), ensureUnlocked handles it?
-  // ensureUnlocked returns data. writeVault needs passphrase.
-  // We need to ensure we have the passphrase.
-  // If ensureUnlocked restored from session, we don't have 'passphrase' arg populated if caller didn't send it.
-  // So we should fetch it from session if missing.
-  
+
   let pass = passphrase;
   if (!pass) {
     const session = await chrome.storage.session.get('vaultPassphrase');
@@ -443,6 +438,7 @@ export async function storeCredential(entry, passphrase) {
 
   await writeVault(data, pass);
   await updateActivity(timeout);
+  await saveCredentialMeta(normalized);
   return normalized;
 }
 
@@ -453,12 +449,10 @@ export async function updateCredential(id, updates, passphrase) {
   const data = await ensureUnlocked(passphrase, timeout);
   data.entries = data.entries || [];
   const index = data.entries.findIndex(item => item.id === id);
-  if (index === -1) {
-    throw new Error('Credential not found');
-  }
+  if (index === -1) throw new Error('Credential not found');
   const updated = normalizeEntry({ ...updates, id }, data.entries[index]);
   data.entries[index] = updated;
-  
+
   let pass = passphrase;
   if (!pass) {
     const session = await chrome.storage.session.get('vaultPassphrase');
@@ -467,6 +461,7 @@ export async function updateCredential(id, updates, passphrase) {
 
   await writeVault(data, pass);
   await updateActivity(timeout);
+  await saveCredentialMeta(updated);
   return updated;
 }
 
@@ -477,11 +472,9 @@ export async function deleteCredential(id, passphrase) {
   const data = await ensureUnlocked(passphrase, timeout);
   data.entries = data.entries || [];
   const index = data.entries.findIndex(item => item.id === id);
-  if (index === -1) {
-    throw new Error('Credential not found');
-  }
+  if (index === -1) throw new Error('Credential not found');
   data.entries.splice(index, 1);
-  
+
   let pass = passphrase;
   if (!pass) {
     const session = await chrome.storage.session.get('vaultPassphrase');
@@ -490,6 +483,7 @@ export async function deleteCredential(id, passphrase) {
 
   await writeVault(data, pass);
   await updateActivity(timeout);
+  await removeCredentialMeta(id);
 }
 
 export async function changeMasterPassword(oldPassphrase, newPassphrase) {
@@ -547,53 +541,131 @@ export async function listCredentials() {
 }
 
 export async function importVaultData(data, passphrase) {
-  // Use the new proper validation here, this logic works along with the upstream check.
   const cleanData = validateImportData(data);
   const newEntries = cleanData.entries;
-  
+
   const settings = await loadSettings();
   const timeout = settings.vaultTimeout || 15;
-  
+
   await ensureUnlocked(passphrase, timeout);
-  
-  // Load existing data to append to
-  // ensureUnlocked might have restored it, or we use passphrase
-  // If ensureUnlocked used session, passphrase arg might be undefined/null if not passed.
-  // But importVaultData is usually called with explicit passphrase from UI prompt?
-  // Actually, in my previous fix for import, I enforced passphrase.
-  // But if the vault is ALREADY unlocked, we might not need it if we can get it from session.
-  
+
   let pass = passphrase;
   if (!pass) {
     const session = await chrome.storage.session.get('vaultPassphrase');
     pass = session.vaultPassphrase;
   }
-  
   if (!pass) throw new Error('Passphrase required to import');
 
-  // We need to re-read data to be sure we have latest
-  const currentData = cache.data; 
+  const currentData = cache.data;
   const existingEntries = currentData.entries || [];
-  
-  const updatedData = {
-    ...currentData,
-    entries: [...existingEntries, ...newEntries]
-  };
-  
+  const updatedData = { ...currentData, entries: [...existingEntries, ...newEntries] };
+
   await writeVault(updatedData, pass);
   await updateActivity(timeout);
-  await writeVault(updatedData, pass);
-  await updateActivity(timeout);
+  // Sync metadata store
+  for (const entry of newEntries) await saveCredentialMeta(entry);
   return newEntries.length;
 }
 
 export async function keepAlive() {
   const settings = await loadSettings();
   const timeout = settings.vaultTimeout || 15;
-  // Only update if unlocked
   if (cache.data) {
     await updateActivity(timeout);
     return true;
   }
   return false;
+}
+
+// ─── Metadata Store ────────────────────────────────────────────────────────────
+// Stores {id, username, site} without passwords.
+// Allows showing credential stubs even when vault is locked.
+
+async function saveCredentialMeta(entry) {
+  try {
+    const items = await chrome.storage.local.get(META_KEY);
+    const meta = items[META_KEY] || [];
+    const { id, username, site, createdAt, updatedAt } = entry;
+    const record = { id, username: username || '', site: site || '', createdAt, updatedAt };
+    const idx = meta.findIndex(m => m.id === id);
+    if (idx >= 0) meta[idx] = record;
+    else meta.push(record);
+    await chrome.storage.local.set({ [META_KEY]: meta });
+  } catch (e) {
+    console.warn('SecurePass: failed to save credential meta', e);
+  }
+}
+
+async function removeCredentialMeta(id) {
+  try {
+    const items = await chrome.storage.local.get(META_KEY);
+    const meta = (items[META_KEY] || []).filter(m => m.id !== id);
+    await chrome.storage.local.set({ [META_KEY]: meta });
+  } catch (e) {
+    console.warn('SecurePass: failed to remove credential meta', e);
+  }
+}
+
+export async function listCredentialsMeta() {
+  try {
+    const items = await chrome.storage.local.get(META_KEY);
+    return items[META_KEY] || [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Biometric / WebAuthn Helpers ─────────────────────────────────────────────
+
+export function getPRFEvalLabel() { return PRF_EVAL_LABEL; }
+
+export async function getBiometricData() {
+  const items = await chrome.storage.local.get(BIOMETRIC_KEY);
+  return items[BIOMETRIC_KEY] || null;
+}
+
+export async function isBiometricEnabled() {
+  const d = await getBiometricData();
+  return d?.enabled === true;
+}
+
+export async function clearBiometricData() {
+  await chrome.storage.local.remove(BIOMETRIC_KEY);
+}
+
+export async function saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable) {
+  await chrome.storage.local.set({
+    [BIOMETRIC_KEY]: { enabled: true, credentialId, encryptedPassphrase, prfAvailable, createdAt: new Date().toISOString() }
+  });
+}
+
+// Derives an AES-256-GCM key from a WebAuthn PRF output via HKDF.
+async function prfToAesKey(prfB64) {
+  const raw = base64ToBuffer(prfB64);
+  const base = await crypto.subtle.importKey('raw', raw, { name: 'HKDF' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: ENCODER.encode(PRF_EVAL_LABEL) },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function encryptPassphraseWithPRF(passphrase, prfB64) {
+  const key = await prfToAesKey(prfB64);
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const ct  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, ENCODER.encode(passphrase));
+  return { iv: bufferToBase64(iv.buffer), ciphertext: bufferToBase64(ct) };
+}
+
+export async function decryptPassphraseWithPRF(encryptedData, prfB64) {
+  const key      = await prfToAesKey(prfB64);
+  const iv       = new Uint8Array(base64ToBuffer(encryptedData.iv));
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    base64ToBuffer(encryptedData.ciphertext)
+  );
+  return DECODER.decode(decrypted);
 }

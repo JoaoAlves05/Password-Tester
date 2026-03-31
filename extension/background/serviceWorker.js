@@ -8,13 +8,24 @@ import {
   updateCredential,
   deleteCredential,
   listCredentials,
+  listCredentialsMeta,
   lockVault,
   vaultStatus,
   changeMasterPassword,
   importVaultData,
-  keepAlive
+  keepAlive,
+  getBiometricData,
+  isBiometricEnabled,
+  clearBiometricData,
+  saveBiometricSetup,
+  encryptPassphraseWithPRF,
+  decryptPassphraseWithPRF,
 } from '../src/cryptoVault.js';
 import { validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
+
+function bufferToBase64(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+}
 
 const pendingSaves = new Map();
 
@@ -131,7 +142,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'LIST_CREDENTIALS': {
         const status = await vaultStatus();
         const entries = await listCredentials();
-        sendResponse({ ok: true, entries, unlocked: status.unlocked });
+        sendResponse({ ok: true, entries, unlocked: status.unlocked, initialized: status.initialized });
+        break;
+      }
+      case 'LIST_CREDENTIALS_META': {
+        const meta = await listCredentialsMeta();
+        sendResponse({ ok: true, meta });
+        break;
+      }
+      case 'GET_CREDENTIAL': {
+        // Returns a single decrypted credential (vault must be unlocked)
+        try {
+          const status = await vaultStatus();
+          if (!status.unlocked) { sendResponse({ ok: false, error: 'Vault is locked' }); break; }
+          const entries = await listCredentials();
+          const entry = entries.find(e => e.id === message.credentialId);
+          sendResponse({ ok: true, entry: entry || null });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'UNLOCK_AND_FILL': {
+        // Unlocks vault with passphrase and returns a specific credential
+        try {
+          const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
+          const settings = await loadSettings();
+          await unlockVault(passphrase, settings.vaultTimeout || 15);
+          const entries = await listCredentials();
+          const entry = message.credentialId ? entries.find(e => e.id === message.credentialId) : null;
+          sendResponse({ ok: true, entry, unlocked: true });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
         break;
       }
       case 'LOCK_VAULT': {
@@ -211,6 +254,161 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const { timeout } = message;
         if (timeout > 0) {
           await chrome.alarms.create('clearClipboard', { delayInMinutes: timeout / 60 });
+        }
+        sendResponse({ ok: true });
+        break;
+      }
+
+      // ─── Biometric / WebAuthn ──────────────────────────────────────────
+      case 'BIOMETRIC_STATUS': {
+        const enabled = await isBiometricEnabled();
+        const data = await getBiometricData();
+        sendResponse({ ok: true, enabled, prfAvailable: data?.prfAvailable ?? false });
+        break;
+      }
+      case 'DISABLE_BIOMETRIC': {
+        await clearBiometricData();
+        sendResponse({ ok: true });
+        break;
+      }
+      case 'BIOMETRIC_REGISTER_START': {
+        // Opens auth.html in 'register' mode. Vault must be unlocked to get passphrase.
+        try {
+          const status = await vaultStatus();
+          if (!status.unlocked) { sendResponse({ ok: false, error: 'Vault must be unlocked to set up biometrics' }); break; }
+          const vaultSession = await chrome.storage.session.get('vaultPassphrase');
+          if (!vaultSession.vaultPassphrase) { sendResponse({ ok: false, error: 'Vault session expired' }); break; }
+
+          const sessionId = crypto.randomUUID();
+          const challenge = bufferToBase64(crypto.getRandomValues(new Uint8Array(32)).buffer);
+          await chrome.storage.session.set({ [`biometric_${sessionId}`]: { challenge, mode: 'register' } });
+
+          const win = await chrome.windows.create({
+            url: chrome.runtime.getURL(`auth/auth.html?sessionId=${sessionId}&mode=register`),
+            type: 'popup', width: 380, height: 300, left: 200, top: 200,
+          });
+          await chrome.storage.session.set({ [`biometric_window_${sessionId}`]: win.id });
+          sendResponse({ ok: true, sessionId });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'BIOMETRIC_REGISTER_COMPLETE': {
+        // Called by auth.html after successful credential creation
+        const { sessionId, credentialId, prfOutput, prfAvailable } = message;
+        try {
+          const vaultSession = await chrome.storage.session.get('vaultPassphrase');
+          const passphrase = vaultSession.vaultPassphrase;
+          let encryptedPassphrase = null;
+          if (prfAvailable && prfOutput && passphrase) {
+            encryptedPassphrase = await encryptPassphraseWithPRF(passphrase, prfOutput);
+          }
+          await saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable);
+          await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
+          sendResponse({ ok: true, prfAvailable });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'BIOMETRIC_AUTH_START': {
+        // Opens auth.html in 'authenticate' mode, returns sessionId to content script
+        try {
+          const biometricData = await getBiometricData();
+          if (!biometricData?.enabled) { sendResponse({ ok: false, error: 'Biometrics not enabled' }); break; }
+
+          const tabId = sender.tab?.id;
+          const sessionId = crypto.randomUUID();
+          const challenge = bufferToBase64(crypto.getRandomValues(new Uint8Array(32)).buffer);
+
+          await chrome.storage.session.set({
+            [`biometric_${sessionId}`]: {
+              challenge,
+              credentialId: biometricData.credentialId,
+              requestedCredentialId: message.credentialId,
+              tabId,
+              mode: 'authenticate',
+            },
+          });
+
+          const win = await chrome.windows.create({
+            url: chrome.runtime.getURL(`auth/auth.html?sessionId=${sessionId}&mode=authenticate`),
+            type: 'popup', width: 380, height: 300, left: 200, top: 200,
+          });
+          await chrome.storage.session.set({ [`biometric_window_${sessionId}`]: win.id });
+          sendResponse({ ok: true, sessionId });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'BIOMETRIC_AUTH_COMPLETE': {
+        // Called by auth.html after successful authentication assertion
+        const { sessionId, prfOutput, prfAvailable } = message;
+        try {
+          const [sRes, wRes] = await Promise.all([
+            chrome.storage.session.get(`biometric_${sessionId}`),
+            chrome.storage.session.get(`biometric_window_${sessionId}`),
+          ]);
+          const sessionData = sRes[`biometric_${sessionId}`];
+          const windowId   = wRes[`biometric_window_${sessionId}`];
+
+          if (!sessionData) { sendResponse({ ok: false, error: 'Session not found' }); break; }
+          const { tabId, requestedCredentialId } = sessionData;
+
+          let entry = null;
+          let unlockError = null;
+          try {
+            // 1. Try PRF-based unlock
+            if (prfAvailable && prfOutput) {
+              const biometricData = await getBiometricData();
+              if (biometricData?.encryptedPassphrase) {
+                const pass = await decryptPassphraseWithPRF(biometricData.encryptedPassphrase, prfOutput);
+                await unlockVault(pass);
+              }
+            }
+            // 2. Fallback: use session passphrase if vault still locked
+            const status = await vaultStatus();
+            if (!status.unlocked) {
+              const vs = await chrome.storage.session.get('vaultPassphrase');
+              if (vs.vaultPassphrase) await unlockVault(vs.vaultPassphrase);
+              else throw new Error('Vault locked. Please use master password.');
+            }
+            // 3. Retrieve requested credential
+            const entries = await listCredentials();
+            entry = requestedCredentialId ? entries.find(e => e.id === requestedCredentialId) : null;
+          } catch (e) {
+            unlockError = e.message;
+          }
+
+          // Clean up session
+          await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
+          // Close auth window
+          if (windowId) { try { await chrome.windows.remove(windowId); } catch {} }
+          // Notify content script
+          if (tabId) {
+            try {
+              chrome.tabs.sendMessage(tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry, error: unlockError });
+            } catch {}
+          }
+          sendResponse({ ok: !unlockError, error: unlockError });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'BIOMETRIC_CANCELLED': {
+        const { sessionId } = message;
+        const wRes = await chrome.storage.session.get(`biometric_window_${sessionId}`);
+        const windowId = wRes[`biometric_window_${sessionId}`];
+        if (windowId) { try { await chrome.windows.remove(windowId); } catch {} }
+        await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
+        // Notify content script that auth was cancelled
+        const sRes = await chrome.storage.session.get(`biometric_${sessionId}`);
+        const sd = sRes[`biometric_${sessionId}`];
+        if (sd?.tabId) {
+          try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: 'Cancelled' }); } catch {}
         }
         sendResponse({ ok: true });
         break;
