@@ -20,7 +20,8 @@
     "alarms",
     "offscreen",
     "clipboardWrite",
-    "idle"
+    "idle",
+    "notifications"
   ],
   "host_permissions": [
     "https://api.pwnedpasswords.com/*"

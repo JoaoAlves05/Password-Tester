@@ -16,6 +16,8 @@ import {
 } from '../src/cryptoVault.js';
 import { validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
 
+const pendingSaves = new Map();
+
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await loadSettings();
   await saveSettings({ ...DEFAULT_SETTINGS, ...settings });
@@ -64,6 +66,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
         }
+        break;
+      }
+      case 'PROMPT_SAVE_CREDENTIAL': {
+        const { entry, origin } = message;
+        const status = await vaultStatus();
+        if (!status.unlocked) {
+          sendResponse({ ok: false, error: 'Vault is locked' });
+          break;
+        }
+        
+        const notifId = `save_cred_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        chrome.notifications.create(notifId, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+          title: 'SecurePass - Save Credential?',
+          message: `Do you want to save the new password for ${entry.username || 'this account'} on ${origin}?`,
+          buttons: [
+            { title: 'Save' },
+            { title: 'Ignore' }
+          ],
+          priority: 2
+        });
+        
+        pendingSaves.set(notifId, entry);
+        sendResponse({ ok: true });
         break;
       }
       case 'STORE_CREDENTIAL': {
@@ -196,6 +223,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   handler();
   return true;
+});
+
+chrome.notifications.onButtonClicked.addListener(async (notifId, btnIdx) => {
+  if (pendingSaves.has(notifId)) {
+    if (btnIdx === 0) { // Save
+      const entry = pendingSaves.get(notifId);
+      try {
+        await storeCredential(entry);
+        chrome.notifications.create(`success_${notifId}`, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+          title: 'SecurePass',
+          message: 'Credential saved successfully!'
+        });
+      } catch (err) {
+        chrome.notifications.create(`error_${notifId}`, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+          title: 'SecurePass Error',
+          message: `Failed to save: ${err.message}`
+        });
+      }
+    }
+    pendingSaves.delete(notifId);
+    chrome.notifications.clear(notifId);
+  }
+});
+
+chrome.notifications.onClosed.addListener((notifId) => {
+  if (pendingSaves.has(notifId)) {
+    pendingSaves.delete(notifId);
+  }
 });
 
 // --- Clipboard Auto-Clear Logic ---

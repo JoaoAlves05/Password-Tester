@@ -1,4 +1,6 @@
 (async () => {
+  const AUTO_SUBMIT_ENABLED = true;
+
   const shadowHost = document.createElement('div');
   shadowHost.id = 'securepass-extension-root';
   shadowHost.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2147483647; overflow: visible;';
@@ -11,91 +13,213 @@
       pointer-events: auto;
       position: absolute;
       z-index: 2147483646;
-      width: 34px;
-      height: 34px;
-      border-radius: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
       border: none;
-      background: rgba(255, 255, 255, 0.8);
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
-      backdrop-filter: blur(12px);
+      background: rgba(37, 99, 235, 0.1);
+      opacity: 0.4;
+      backdrop-filter: blur(4px);
       cursor: pointer;
       display: grid;
       place-items: center;
-      transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .securepass-floating:hover, .securepass-floating--focused, .securepass-floating--active {
+      opacity: 1;
+      background: rgba(37, 99, 235, 0.8);
     }
     .securepass-floating svg {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       color: #0f172a;
+      transition: color 0.2s ease;
     }
-    .securepass-floating--active {
-      background: rgba(37, 99, 235, 0.15);
+    .securepass-floating:hover svg, .securepass-floating--focused svg, .securepass-floating--active svg {
+      color: #ffffff;
     }
     .securepass-panel {
       pointer-events: auto;
       position: absolute;
       z-index: 2147483647;
       width: 320px;
-      border-radius: 18px;
+      border-radius: 16px;
       padding: 16px;
-      background: rgba(15, 23, 42, 0.86);
+      background: rgba(15, 23, 42, 0.85);
       color: #f8fafc;
-      box-shadow: 0 25px 60px rgba(2, 6, 23, 0.55);
-      backdrop-filter: blur(18px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       font-family: 'Inter', system-ui, sans-serif;
+      animation: securepass-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-origin: top center;
+    }
+    @keyframes securepass-slide-in {
+      from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .securepass-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
     .securepass-panel h3 {
-      margin: 0 0 4px;
-      font-size: 0.9rem;
+      margin: 0;
+      font-size: 0.85rem;
       font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .securepass-panel .securepass-meter {
-      height: 8px;
+    .securepass-panel .context-badge {
+      font-size: 0.65rem;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+    }
+    .securepass-meter {
+      height: 6px;
       border-radius: 999px;
-      background: rgba(148, 163, 184, 0.25);
+      background: rgba(255, 255, 255, 0.1);
       overflow: hidden;
       margin-bottom: 6px;
     }
-    .securepass-panel .securepass-meter div {
+    .securepass-meter div {
       height: 100%;
       width: 6%;
       border-radius: inherit;
       background: #ef4444;
       transition: width 0.3s ease, background 0.3s ease;
     }
-    .securepass-panel .securepass-meta {
+    .securepass-meta {
       font-size: 0.75rem;
       display: flex;
       justify-content: space-between;
-      color: rgba(226, 232, 240, 0.85);
-      margin-bottom: 6px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
     }
     .securepass-panel ul {
       margin: 0;
-      padding-left: 1rem;
-      max-height: 90px;
+      padding-left: 1.2rem;
+      max-height: 80px;
       overflow-y: auto;
       font-size: 0.75rem;
+      color: #94a3b8;
     }
-    .securepass-panel .securepass-actions {
+    .securepass-panel ul li { margin-bottom: 2px; }
+    .securepass-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .securepass-actions {
       display: flex;
       gap: 8px;
-      margin-top: 10px;
+      margin-top: 12px;
     }
-    .securepass-panel .securepass-actions button {
+    .securepass-btn {
       flex: 1;
-      border: none;
-      border-radius: 10px;
-      background: rgba(148, 163, 184, 0.25);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
       color: #f8fafc;
       padding: 6px 8px;
-      font-weight: 600;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .securepass-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .securepass-btn.primary {
+      background: rgba(37, 99, 235, 0.8);
+      border-color: transparent;
+    }
+    .securepass-btn.primary:hover {
+      background: rgba(37, 99, 235, 1);
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+    }
+    .securepass-icon-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      transition: all 0.15s ease;
+    }
+    .securepass-icon-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #f8fafc;
+    }
+    .securepass-icon-btn svg { width: 14px; height: 14px; }
+    .securepass-status {
+      font-size: 0.7rem;
+      margin-top: 8px;
+      text-align: center;
+      color: #94a3b8;
+      min-height: 14px;
+    }
+    .autofill-btn {
+      width: 100%;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      border-radius: 8px;
+      color: #f8fafc;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .autofill-btn:hover {
+      background: rgba(37, 99, 235, 0.3);
+      border-color: rgba(37, 99, 235, 0.5);
+    }
+    .autofill-icon {
+      background: #1e293b;
+      padding: 4px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+    }
+    .securepass-gen-settings {
+      display: none;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      font-size: 0.75rem;
+    }
+    .securepass-gen-settings.open {
+      display: block;
+    }
+    .securepass-gen-settings label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
       cursor: pointer;
     }
-    .securepass-panel .securepass-status {
-      font-size: 0.7rem;
-      margin-top: 6px;
-      color: rgba(248, 250, 252, 0.75);
+    .securepass-gen-settings input[type="range"] {
+      width: 100%;
+      margin: 4px 0 8px 0;
     }
   `;
   shadowRoot.appendChild(style);
@@ -106,6 +230,26 @@
   ]);
 
   const tracked = new Map();
+
+  document.addEventListener('submit', (e) => {
+    for (const [field, entry] of tracked.entries()) {
+      if (field.form === e.target || e.composedPath().includes(field.form)) {
+        const pass = field.value;
+        if (!pass) continue;
+        const user = entry.constraints.usernameField ? entry.constraints.usernameField.value : '';
+        chrome.runtime.sendMessage({
+          type: 'PROMPT_SAVE_CREDENTIAL',
+          entry: {
+            site: window.location.origin,
+            username: user,
+            password: pass,
+            notes: 'Auto-saved after submit'
+          },
+          origin: window.location.hostname
+        }, () => {});
+      }
+    }
+  }, true);
 
   function mapScoreToColor(score) {
     if (score >= 0.8) return 'linear-gradient(90deg,#22c55e,#16a34a)';
@@ -120,70 +264,204 @@
       button.style.opacity = '0';
       return;
     }
+    // positioned inside the input on the right side
     const top = rect.top + window.scrollY + rect.height / 2 - button.offsetHeight / 2;
-    const left = rect.right + window.scrollX + 8;
-    button.style.opacity = '1';
+    const left = rect.right + window.scrollX - button.offsetWidth - 8;
     button.style.top = `${Math.max(0, top)}px`;
     button.style.left = `${left}px`;
   }
 
   function positionPanel(panel, field) {
     const rect = field.getBoundingClientRect();
-    const top = rect.bottom + window.scrollY + 10;
-    const left = rect.left + window.scrollX;
+    const top = rect.bottom + window.scrollY + 8;
+    let left = rect.left + window.scrollX;
+    
+    // adjust to prevent overflow
+    if (left + 320 > window.innerWidth) {
+      left = window.innerWidth - 340;
+    }
+    
     panel.style.top = `${top}px`;
-    panel.style.left = `${left}px`;
+    panel.style.left = `${Math.max(8, left)}px`;
   }
 
-  function updatePanel(panel, password) {
+  function updatePanel(panel, password, constraints) {
     const { score, verdict, entropy, suggestions } = passwordModule.evaluatePassword(password);
     panel.querySelector('.securepass-meter div').style.width = `${Math.max(score * 100, 6)}%`;
     panel.querySelector('.securepass-meter div').style.background = mapScoreToColor(score);
     panel.querySelector('.securepass-verdict').textContent = verdict;
     panel.querySelector('.securepass-entropy').textContent = `${entropy} bits`;
     const list = panel.querySelector('ul');
-    list.innerHTML = '';
-    suggestions.forEach(tip => {
-      const li = document.createElement('li');
-      li.textContent = tip;
-      list.appendChild(li);
-    });
-    if (!suggestions.length) {
-      const li = document.createElement('li');
-      li.textContent = 'Looking strong. Keep it memorable.';
-      list.appendChild(li);
+    if (list) {
+      list.innerHTML = '';
+      suggestions.forEach(tip => {
+        const li = document.createElement('li');
+        li.textContent = tip;
+        list.appendChild(li);
+      });
+      if (!suggestions.length && password.length > 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Looking strong. Keep it memorable.';
+        list.appendChild(li);
+      }
     }
   }
 
   function createPanel(field, constraints, button) {
+    const isLogin = constraints.context === 'login';
+    const isRegister = constraints.context === 'register';
+
     const panel = document.createElement('div');
     panel.className = 'securepass-panel';
-    panel.innerHTML = `
-      <h3>SecurePass insight</h3>
-      <div class="securepass-meter"><div></div></div>
-      <div class="securepass-meta">
-        <span class="securepass-verdict">Weak</span>
-        <span class="securepass-entropy">0 bits</span>
+    
+    let contentHtml = `
+      <div class="securepass-panel-header">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#3b82f6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          SecurePass
+          <span class="context-badge">${isLogin ? 'Login' : (isRegister ? 'Register' : 'Password')}</span>
+        </h3>
+        <div style="display:flex; gap:4px;">
+          <button type="button" class="securepass-icon-btn copy-btn" title="Copy password">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+          <button type="button" class="securepass-icon-btn toggle-vis-btn" title="Show/Hide password">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        </div>
       </div>
-      <ul></ul>
-      <div class="securepass-autofill-section" style="display:none; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-        <h3 style="margin-bottom: 4px;">Autofill</h3>
-        <div class="autofill-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-      </div>
-      <div class="securepass-actions">
-        <button type="button" class="securepass-generate">Generate</button>
-        <button type="button" class="securepass-hibp">HIBP</button>
-      </div>
-      <div class="securepass-status"></div>
     `;
+
+    // Only show full meter if registering or unknown
+    if (!isLogin) {
+      contentHtml += `
+        <div class="securepass-meter"><div></div></div>
+        <div class="securepass-meta">
+          <span class="securepass-verdict">Weak</span>
+          <span class="securepass-entropy">0 bits</span>
+        </div>
+        <ul></ul>
+      `;
+    }
+
+    contentHtml += `
+      <div class="securepass-section securepass-autofill-section" style="display:none; margin-top: ${isLogin ? '0' : '12px'}; padding-top: ${isLogin ? '0' : '12px'}; border-top: ${isLogin ? 'none' : '1px solid rgba(255,255,255,0.1)'};">
+        <h3 style="margin-bottom: 8px; font-size:0.75rem; color:#94a3b8;">Saved Credentials</h3>
+        <div class="autofill-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+    `;
+
+    let actionsHtml = `<div class="securepass-actions">`;
+    const genSettingsHtml = `
+      <div class="securepass-gen-settings">
+        <label>Length: <span class="gen-len-val">16</span></label>
+        <input type="range" class="gen-len" min="12" max="64" value="16">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px;">
+          <label><input type="checkbox" class="gen-upper" checked> A-Z</label>
+          <label><input type="checkbox" class="gen-lower" checked> a-z</label>
+          <label><input type="checkbox" class="gen-num" checked> 0-9</label>
+          <label><input type="checkbox" class="gen-sym" checked> !@#</label>
+        </div>
+      </div>
+    `;
+
+    if (!isLogin) {
+      actionsHtml += `
+        <div style="display:flex; flex-direction:column; flex:1; gap:4px;">
+          <div style="display:flex; gap:4px;">
+            <button type="button" class="securepass-btn securepass-generate" tabindex="0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg> Generate</button>
+            <button type="button" class="securepass-icon-btn gen-settings-btn" title="Options" tabindex="0">⚙️</button>
+          </div>
+          ${genSettingsHtml}
+        </div>
+      `;
+      actionsHtml += `<button type="button" class="securepass-btn securepass-save primary" tabindex="0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save</button>`;
+    } else {
+      actionsHtml += `
+        <div style="display:flex; flex-direction:column; flex:1; gap:4px;">
+          <div style="display:flex; gap:4px;">
+            <button type="button" class="securepass-btn securepass-generate" tabindex="0">Generate</button>
+            <button type="button" class="securepass-icon-btn gen-settings-btn" title="Options" tabindex="0">⚙️</button>
+          </div>
+          ${genSettingsHtml}
+        </div>
+      `;
+    }
+    actionsHtml += `</div>`;
+    
+    // Always HIBP below
+    actionsHtml += `<div class="securepass-actions"><button type="button" class="securepass-btn securepass-hibp" style="font-size: 0.7rem; padding: 4px;">Check if Pwned (HIBP)</button></div>`;
+
+    contentHtml += actionsHtml;
+    contentHtml += `<div class="securepass-status"></div>`;
+
+    panel.innerHTML = contentHtml;
     shadowRoot.appendChild(panel);
-    updatePanel(panel, field.value);
+    
+    if (!isLogin) {
+      updatePanel(panel, field.value, constraints);
+    }
     positionPanel(panel, field);
 
     const statusEl = panel.querySelector('.securepass-status');
     const generateBtn = panel.querySelector('.securepass-generate');
+    const saveBtn = panel.querySelector('.securepass-save');
     const hibpBtn = panel.querySelector('.securepass-hibp');
+    const copyBtn = panel.querySelector('.copy-btn');
+    const toggleBtn = panel.querySelector('.toggle-vis-btn');
+    const genSettingsBtn = panel.querySelector('.gen-settings-btn');
+    const genSettingsPanel = panel.querySelector('.securepass-gen-settings');
+    const lenInput = panel.querySelector('.gen-len');
+    const lenVal = panel.querySelector('.gen-len-val');
+    const checks = ['upper', 'lower', 'num', 'sym'].map(k => ({ key: k, el: panel.querySelector(`.gen-${k}`) }));
 
+    if (genSettingsBtn && genSettingsPanel) {
+      genSettingsBtn.addEventListener('click', () => {
+        genSettingsPanel.classList.toggle('open');
+        positionPanel(panel, field);
+      });
+      lenInput.addEventListener('input', e => {
+        lenVal.textContent = e.target.value;
+        constraints.maxLength = parseInt(e.target.value, 10);
+      });
+      checks.forEach(({ key, el }) => {
+        el.addEventListener('change', () => {
+          if (!constraints.customRequirements) constraints.customRequirements = {};
+          if (key === 'upper') constraints.customRequirements.requiresUppercase = el.checked;
+          if (key === 'lower') constraints.customRequirements.requiresLowercase = el.checked;
+          if (key === 'num') constraints.customRequirements.requiresNumber = el.checked;
+          if (key === 'sym') constraints.customRequirements.requiresSymbol = el.checked;
+        });
+      });
+    }
+
+    // Show/Hide password toggle logic
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+        field.setAttribute('type', type);
+        toggleBtn.innerHTML = type === 'password'
+          ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+      });
+    }
+
+    // Copy to clipboard
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        if (!field.value) return;
+        try {
+          await navigator.clipboard.writeText(field.value);
+          statusEl.textContent = 'Copied to clipboard!';
+          statusEl.style.color = '#22c55e';
+          setTimeout(() => statusEl.textContent = '', 2000);
+        } catch(e) {
+          statusEl.textContent = 'Failed to copy.';
+        }
+      });
+    }
+
+    // Autofill section
     chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, response => {
       if (chrome.runtime.lastError) return;
       if (response && response.ok && response.unlocked && response.entries) {
@@ -204,50 +482,73 @@
           matches.forEach(m => {
              const btn = document.createElement('button');
              btn.type = 'button';
-             btn.textContent = m.username || 'No username';
-             btn.style.cssText = 'background: rgba(37, 99, 235, 0.25); border: none; border-radius: 6px; color: #f8fafc; padding: 4px 8px; font-size: 0.75rem; cursor: pointer; text-align: left; transition: background 0.2s ease;';
-             btn.addEventListener('mouseover', () => btn.style.background = 'rgba(37, 99, 235, 0.45)');
-             btn.addEventListener('mouseout', () => btn.style.background = 'rgba(37, 99, 235, 0.25)');
+             btn.className = 'autofill-btn';
+             btn.innerHTML = `
+               <div class="autofill-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
+               <div>
+                  <div style="font-weight:600;">${m.username || 'No username'}</div>
+                  <div style="font-size:0.65rem; color:#94a3b8; margin-top:2px;">${host}</div>
+               </div>
+             `;
+             
              btn.addEventListener('click', () => {
                 field.value = m.password;
                 field.dispatchEvent(new Event('input', { bubbles: true }));
                 
+                let userFilled = false;
                 if (m.username) {
-                  const form = field.form || field.closest('form');
-                  if (form) {
-                    const userField = Array.from(form.elements).find(el => {
-                      if (el === field) return false;
-                      const isTextInput = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'email' || el.name.toLowerCase().includes('user') || el.name.toLowerCase().includes('email'));
-                      return isTextInput;
-                    }) || document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"]');
-                    
-                    if (userField) {
-                      userField.value = m.username;
-                      userField.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                  } else {
-                    const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
-                    for(const inp of inputs) {
-                      if (inp !== field && inp.getBoundingClientRect().top < field.getBoundingClientRect().top) {
-                         inp.value = m.username;
-                         inp.dispatchEvent(new Event('input', { bubbles: true }));
-                         break;
+                  if (constraints.usernameField) {
+                     constraints.usernameField.value = m.username;
+                     constraints.usernameField.dispatchEvent(new Event('input', { bubbles: true }));
+                     userFilled = true;
+                  }
+                  // Backup heuristic
+                  if (!userFilled) {
+                    const form = field.form || field.closest('form');
+                    if (form) {
+                      const userField = Array.from(form.elements).find(el => {
+                        if (el === field) return false;
+                        return el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'email' || el.name.toLowerCase().includes('user') || el.name.toLowerCase().includes('email'));
+                      }) || document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"]');
+                      if (userField) {
+                        userField.value = m.username;
+                        userField.dispatchEvent(new Event('input', { bubbles: true }));
                       }
                     }
                   }
                 }
-                statusEl.textContent = 'Autofilled!';
+                statusEl.textContent = 'Autofilled successfully!';
+                statusEl.style.color = '#22c55e';
+                setTimeout(() => {
+                  cleanup();
+                  if (AUTO_SUBMIT_ENABLED && field.form) {
+                    try {
+                      field.form.requestSubmit();
+                    } catch (e) {
+                      try { field.form.submit(); } catch (e2) {}
+                    }
+                  }
+                }, 1000);
              });
              list.appendChild(btn);
           });
           setTimeout(() => positionPanel(panel, field), 10);
+        } else if (isLogin) {
+          statusEl.textContent = 'No saved passwords for this site.';
         }
+      } else if (isLogin) {
+         statusEl.innerHTML = 'Vault is locked. <a href="#" style="color:#60a5fa" id="open-ext-login">Unlock</a>';
+         const link = statusEl.querySelector('#open-ext-login');
+         if(link) {
+           link.addEventListener('click', (e) => {
+             e.preventDefault();
+             statusEl.textContent = 'Please open the extension from toolbar.';
+           });
+         }
       }
     });
 
-    const ro = new ResizeObserver(() => {
-      positionPanel(panel, field);
-    });
+    const ro = new ResizeObserver(() => positionPanel(panel, field));
     ro.observe(field);
 
     const scrollHandler = () => positionPanel(panel, field);
@@ -255,8 +556,14 @@
     window.addEventListener('resize', scrollHandler);
 
     const inputHandler = () => {
-      updatePanel(panel, field.value);
+      if (!isLogin) updatePanel(panel, field.value, constraints);
       statusEl.textContent = '';
+      statusEl.style.color = '#94a3b8';
+      
+      // Mirror to confirm field if it's there and empty/partially filled
+      if (constraints.confirmField && constraints.confirmField.value !== field.value) {
+         // Auto-fill confirm only if generate was used or it's empty, but let's be careful
+      }
     };
     field.addEventListener('input', inputHandler);
 
@@ -265,51 +572,157 @@
       if (path.includes(panel) || path.includes(button)) return;
       cleanup();
     };
-    document.addEventListener('click', outsideHandler, true);
+    document.addEventListener('mousedown', outsideHandler, true);
 
-    generateBtn.addEventListener('click', async () => {
-      generateBtn.disabled = true;
-      const response = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ type: 'GENERATE_PASSWORD', constraints }, res => {
-          if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
-          resolve(res);
-        });
-      });
-      generateBtn.disabled = false;
-      if (!response || !response.ok) {
-        statusEl.textContent = response?.error || 'Unable to generate password.';
-        return;
+    panel.tabIndex = -1;
+    panel.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        field.focus();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const focusables = Array.from(panel.querySelectorAll('button, input, [tabindex="0"]')).filter(el => el.offsetParent !== null);
+        const index = focusables.indexOf(document.activeElement);
+        if (index > -1 || e.target === panel) {
+          e.preventDefault();
+          let next = index;
+          if (e.key === 'ArrowDown') next = index + 1;
+          if (e.key === 'ArrowUp') next = index - 1;
+          if (next >= focusables.length) next = 0;
+          if (next < 0) next = focusables.length - 1;
+          focusables[next].focus();
+        }
       }
-      field.value = response.password;
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-      updatePanel(panel, field.value);
-      statusEl.textContent = 'Generated password applied.';
     });
 
-    hibpBtn.addEventListener('click', async () => {
-      hibpBtn.disabled = true;
-      statusEl.textContent = 'Checking HIBP…';
-      const response = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ type: 'HIBP_CHECK', password: field.value }, res => {
-          if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
-          resolve(res);
-        });
-      });
-      hibpBtn.disabled = false;
-      if (!response || !response.ok) {
-        statusEl.textContent = response?.error || 'HIBP check failed.';
-        return;
+    const fieldKeydown = (e) => {
+      if (e.key === 'ArrowDown' && panel.parentElement) {
+        e.preventDefault();
+        const first = panel.querySelector('button, [tabindex="0"]');
+        if (first) first.focus();
+      } else if (e.key === 'Escape' && panel.parentElement) {
+        e.preventDefault();
+        cleanup();
       }
-      statusEl.textContent = response.result?.compromised
-        ? `Breached ${response.result.count.toLocaleString()} times`
-        : 'Not found in breaches';
-    });
+    };
+    field.addEventListener('keydown', fieldKeydown);
+
+    if (generateBtn) {
+      generateBtn.addEventListener('click', async () => {
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = 'Generating...';
+        const response = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ type: 'GENERATE_PASSWORD', constraints }, res => {
+            if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
+            resolve(res);
+          });
+        });
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg> Generate`;
+        
+        if (!response || !response.ok) {
+          statusEl.textContent = response?.error || 'Unable to generate password.';
+          statusEl.style.color = '#ef4444';
+          return;
+        }
+        
+        field.value = response.password;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        // Auto-fill confirm field
+        if (constraints.confirmField) {
+           constraints.confirmField.value = response.password;
+           constraints.confirmField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        if (!isLogin) updatePanel(panel, field.value, constraints);
+        statusEl.textContent = 'Generated password applied.';
+        statusEl.style.color = '#22c55e';
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const pass = field.value;
+        if (!pass) {
+          statusEl.textContent = 'Password is empty.';
+          statusEl.style.color = '#ef4444';
+          return;
+        }
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = 'Saving...';
+        
+        let user = '';
+        if (constraints.usernameField) {
+           user = constraints.usernameField.value;
+        }
+
+        const entry = {
+          site: window.location.origin,
+          username: user,
+          password: pass,
+          notes: 'Saved from inline assistant'
+        };
+
+        const response = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ type: 'STORE_CREDENTIAL', entry }, res => {
+             if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
+             resolve(res);
+          });
+        });
+
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save`;
+
+        if (!response || !response.ok) {
+           if (response?.error === 'Vault is locked') {
+              statusEl.textContent = 'Vault locked! Unlock in extension.';
+           } else {
+              statusEl.textContent = response?.error || 'Failed to save.';
+           }
+           statusEl.style.color = '#ef4444';
+           return;
+        }
+        statusEl.textContent = 'Credential saved!';
+        statusEl.style.color = '#22c55e';
+        setTimeout(() => cleanup(), 1500);
+      });
+    }
+
+    if (hibpBtn) {
+      hibpBtn.addEventListener('click', async () => {
+        if (!field.value) return;
+        hibpBtn.disabled = true;
+        statusEl.textContent = 'Checking HIBP…';
+        statusEl.style.color = '#94a3b8';
+        const response = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ type: 'HIBP_CHECK', password: field.value }, res => {
+            if (chrome.runtime.lastError) return resolve({ ok: false, error: chrome.runtime.lastError.message });
+            resolve(res);
+          });
+        });
+        hibpBtn.disabled = false;
+        if (!response || !response.ok) {
+          statusEl.textContent = response?.error || 'HIBP check failed.';
+          statusEl.style.color = '#ef4444';
+          return;
+        }
+        if (response.result?.compromised) {
+           statusEl.textContent = `Breached ${response.result.count.toLocaleString()} times`;
+           statusEl.style.color = '#ef4444';
+        } else {
+           statusEl.textContent = 'Not found in breaches (Safe)';
+           statusEl.style.color = '#22c55e';
+        }
+      });
+    }
 
     const cleanup = () => {
-      document.removeEventListener('click', outsideHandler, true);
+      document.removeEventListener('mousedown', outsideHandler, true);
       window.removeEventListener('scroll', scrollHandler, true);
       window.removeEventListener('resize', scrollHandler);
       field.removeEventListener('input', inputHandler);
+      field.removeEventListener('keydown', fieldKeydown);
       ro.disconnect();
       panel.remove();
       button.classList.remove('securepass-floating--active');
@@ -327,10 +740,10 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'securepass-floating';
+    button.title = 'SecurePass';
     button.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2l7 4v8c0 4-3 7-7 8-4-1-7-4-7-8V6l7-4z"></path>
-        <path d="M9 12l2 2 4-4"></path>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
       </svg>
     `;
     button.setAttribute('aria-label', 'Open SecurePass tools');
@@ -342,6 +755,10 @@
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
     reposition();
+
+    // Hover logic to focus field/button
+    field.addEventListener('focus', () => button.classList.add('securepass-floating--focused'));
+    field.addEventListener('blur', () => button.classList.remove('securepass-floating--focused'));
 
     const entry = { button, constraints, panelCleanup: null };
     tracked.set(field, entry);
@@ -369,6 +786,7 @@
     button.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
+      field.focus();
       if (entry.panelCleanup) {
         entry.panelCleanup();
         entry.panelCleanup = null;
