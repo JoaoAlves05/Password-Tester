@@ -130,6 +130,11 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
+      cursor: grab;
+      user-select: none;
+    }
+    .securepass-panel-header:active {
+      cursor: grabbing;
     }
     .securepass-panel h3 {
       margin: 0;
@@ -455,7 +460,9 @@
   // ── Resolve theme ──
   async function resolveThemeClass() {
     try {
-      const stored = await chrome.storage.local.get('settings');
+      const syncInfo = await chrome.storage.local.get('settingsSync');
+      const area = syncInfo?.settingsSync?.useSync ? 'sync' : 'local';
+      const stored = await chrome.storage[area].get('settings');
       const theme = stored?.settings?.theme || 'system';
       if (theme === 'dark') return 'sp-dark';
       if (theme === 'light') return 'sp-light';
@@ -465,6 +472,21 @@
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'sp-dark' : 'sp-light';
     }
   }
+
+  function updateAllThemes() {
+    resolveThemeClass().then(cls => {
+      shadowRoot.querySelectorAll('.securepass-panel').forEach(panel => {
+        panel.classList.remove('sp-dark', 'sp-light');
+        panel.classList.add(cls);
+      });
+    });
+  }
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.settingsSync) updateAllThemes();
+    if (changes.settings) updateAllThemes();
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateAllThemes);
 
   const [{ observePasswordFields }, passwordModule] = await Promise.all([
     import(chrome.runtime.getURL('src/formAnalyzer.js')),
@@ -669,6 +691,44 @@
 
     // Apply theme
     resolveThemeClass().then(cls => panel.classList.add(cls));
+
+    // Make panel draggable via header
+    const header = panel.querySelector('.securepass-panel-header');
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let initialTop = 0, initialLeft = 0;
+
+    const handleDrag = (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      panel.style.top = `${Math.max(0, initialTop + dy)}px`;
+      panel.style.left = `${Math.max(0, initialLeft + dx)}px`;
+      panel.style.bottom = 'auto';
+      panel.style.right = 'auto';
+      panel.dataset.positioned = '1'; // prevent position recalculation
+    };
+
+    const stopDrag = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      document.removeEventListener('mousemove', handleDrag, true);
+      document.removeEventListener('mouseup', stopDrag, true);
+    };
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return; // let buttons work normally
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      const rect = panel.getBoundingClientRect();
+      initialTop = rect.top;
+      initialLeft = rect.left;
+      
+      document.addEventListener('mousemove', handleDrag, true);
+      document.addEventListener('mouseup', stopDrag, true);
+    });
     
     if (!isLogin) {
       updatePanel(panel, field.value, constraints);
