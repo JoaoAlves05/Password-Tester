@@ -300,6 +300,9 @@
       cursor: pointer;
       transition: all 0.18s ease;
       outline: none;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 0.8rem;
     }
     .securepass-stub:hover { background: rgba(37,99,235,0.18); border-color: rgba(37,99,235,0.4); }
     .securepass-stub:focus-visible { box-shadow: 0 0 0 2px rgba(59,130,246,0.5); }
@@ -925,18 +928,26 @@
 
     // 1. Fetch metadata immediately (no vault needed)
     chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS_META' }, metaRes => {
-      if (chrome.runtime.lastError || !metaRes?.ok) return;
-      const meta = metaRes.meta || [];
-      // Render stubs right away (vault may still be locked)
-      renderStubs(meta, null);
+      if (chrome.runtime.lastError) metaRes = { ok: true, meta: [] };
+      const meta = metaRes?.meta || [];
 
-      // 2. In parallel: check vault status + get full entries if unlocked
+      // Render stubs from metadata right away (vault may still be locked)
+      if (meta.length) renderStubs(meta, null);
+
+      // 2. Check vault status + get full entries if unlocked
       chrome.runtime.sendMessage({ type: 'LIST_CREDENTIALS' }, fullRes => {
         if (chrome.runtime.lastError || !fullRes?.ok) return;
         vaultUnlocked = fullRes.unlocked;
+
         if (fullRes.unlocked && fullRes.entries?.length) {
-          // Re-render stubs with unlock icons replaced by checkmarks
-          renderStubs(meta, fullRes.entries);
+          // Build stubs from real entries (covers pre-existing credentials with no metadata)
+          const fullMeta = fullRes.entries.map(e => ({
+            id: e.id, username: e.username || '', site: e.site || '',
+            createdAt: e.createdAt, updatedAt: e.updatedAt,
+          }));
+          renderStubs(fullMeta, fullRes.entries);
+        } else if (!meta.length && isLogin) {
+          statusEl.textContent = 'Nenhuma password guardada para este site.';
         }
       });
     });

@@ -615,6 +615,35 @@ export async function listCredentialsMeta() {
   }
 }
 
+// Backfill: syncs the metadata store from vault entries.
+// Called when vault is unlocked to ensure pre-existing credentials have metadata.
+export async function syncMetadataFromEntries(entries) {
+  if (!entries || !entries.length) return;
+  try {
+    const items = await chrome.storage.local.get(META_KEY);
+    const meta = items[META_KEY] || [];
+    const existingIds = new Set(meta.map(m => m.id));
+    let changed = false;
+    for (const entry of entries) {
+      if (!existingIds.has(entry.id)) {
+        meta.push({
+          id: entry.id,
+          username: entry.username || '',
+          site: entry.site || '',
+          createdAt: entry.createdAt,
+          updatedAt: entry.updatedAt,
+        });
+        changed = true;
+      }
+    }
+    if (changed) {
+      await chrome.storage.local.set({ [META_KEY]: meta });
+    }
+  } catch (e) {
+    console.warn('SecurePass: failed to sync metadata', e);
+  }
+}
+
 // ─── Biometric / WebAuthn Helpers ─────────────────────────────────────────────
 
 export function getPRFEvalLabel() { return PRF_EVAL_LABEL; }

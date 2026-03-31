@@ -14,6 +14,7 @@ import {
   changeMasterPassword,
   importVaultData,
   keepAlive,
+  syncMetadataFromEntries,
   getBiometricData,
   isBiometricEnabled,
   clearBiometricData,
@@ -142,6 +143,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'LIST_CREDENTIALS': {
         const status = await vaultStatus();
         const entries = await listCredentials();
+        // Backfill metadata for pre-existing credentials (before metadata feature)
+        if (status.unlocked && entries.length) {
+          syncMetadataFromEntries(entries).catch(() => {});
+        }
         sendResponse({ ok: true, entries, unlocked: status.unlocked, initialized: status.initialized });
         break;
       }
@@ -170,6 +175,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const settings = await loadSettings();
           await unlockVault(passphrase, settings.vaultTimeout || 15);
           const entries = await listCredentials();
+          // Backfill metadata on unlock
+          if (entries.length) syncMetadataFromEntries(entries).catch(() => {});
           const entry = message.credentialId ? entries.find(e => e.id === message.credentialId) : null;
           sendResponse({ ok: true, entry, unlocked: true });
         } catch (error) {
