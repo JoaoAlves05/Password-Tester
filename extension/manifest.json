@@ -44,12 +44,14 @@
       "resources": [
         "src/*.js",
         "popup/popup.css",
-        "options/options.css"
+        "options/options.css",
+        "auth/auth.html",
+        "auth/auth.js"
       ],
       "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; connect-src 'self' https://api.pwnedpasswords.com; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    "extension_pages": "default-src 'self'; connect-src 'self' https://api.pwnedpasswords.com; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors *"
   }
 }

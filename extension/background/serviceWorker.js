@@ -314,12 +314,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               mode: 'authenticate',
             },
           });
-
-          const win = await chrome.windows.create({
-            url: chrome.runtime.getURL(`auth/auth.html?sessionId=${sessionId}&mode=authenticate`),
-            type: 'popup', width: 380, height: 300, left: 200, top: 200,
-          });
-          await chrome.storage.session.set({ [`biometric_window_${sessionId}`]: win.id });
           sendResponse({ ok: true, sessionId });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -330,12 +324,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Called by auth.html after successful authentication assertion
         const { sessionId, prfOutput, prfAvailable } = message;
         try {
-          const [sRes, wRes] = await Promise.all([
-            chrome.storage.session.get(`biometric_${sessionId}`),
-            chrome.storage.session.get(`biometric_window_${sessionId}`),
-          ]);
+          const sRes = await chrome.storage.session.get(`biometric_${sessionId}`);
           const sessionData = sRes[`biometric_${sessionId}`];
-          const windowId   = wRes[`biometric_window_${sessionId}`];
 
           if (!sessionData) { sendResponse({ ok: false, error: 'Session not found' }); break; }
           const { tabId, requestedCredentialId } = sessionData;
@@ -366,9 +356,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           // Clean up session
-          await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
-          // Close auth window
-          if (windowId) { try { await chrome.windows.remove(windowId); } catch {} }
+          await chrome.storage.session.remove(`biometric_${sessionId}`);
+          // Notify content script
           // Notify content script
           if (tabId) {
             try {
@@ -383,17 +372,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'BIOMETRIC_CANCELLED': {
         const { sessionId } = message;
-        const wRes = await chrome.storage.session.get(`biometric_window_${sessionId}`);
-        const windowId = wRes[`biometric_window_${sessionId}`];
-        if (windowId) { try { await chrome.windows.remove(windowId); } catch {} }
-        await chrome.storage.session.remove([`biometric_${sessionId}`, `biometric_window_${sessionId}`]);
-        // Notify content script that auth was cancelled
-        const sRes = await chrome.storage.session.get(`biometric_${sessionId}`);
-        const sd = sRes[`biometric_${sessionId}`];
-        if (sd?.tabId) {
-          try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: 'Cancelled' }); } catch {}
+        const sessionKey = `biometric_${sessionId}`;
+        
+        try {
+          const sRes = await chrome.storage.session.get(sessionKey);
+          const sd = sRes[sessionKey];
+          // Notify content script that auth was cancelled
+          if (sd?.tabId) {
+            try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: 'Cancelled' }); } catch {}
+          }
+          await chrome.storage.session.remove(sessionKey);
+          sendResponse({ ok: true });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
         }
-        sendResponse({ ok: true });
         break;
       }
 

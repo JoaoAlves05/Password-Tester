@@ -1012,6 +1012,12 @@
             errorEl.textContent = res?.error || 'Erro ao iniciar biometria.';
           } else {
             activeBiometricSessionId = res.sessionId;
+            const authIframe = document.createElement('iframe');
+            authIframe.className = 'securepass-auth-iframe';
+            authIframe.src = chrome.runtime.getURL(`auth/auth.html?sessionId=${res.sessionId}&mode=authenticate`);
+            authIframe.style.cssText = 'width:0;height:0;border:none;position:absolute;';
+            authIframe.allow = "publickey-credentials-get *";
+            overlay.appendChild(authIframe);
           }
         });
       }
@@ -1023,6 +1029,9 @@
       if (activeBiometricSessionId && msg.sessionId !== activeBiometricSessionId) return;
       activeBiometricSessionId = null;
       const overlay = panel.querySelector('.securepass-auth-overlay');
+      const authIframe = overlay?.querySelector('.securepass-auth-iframe');
+      if (authIframe) authIframe.remove();
+      
       if (msg.entry) {
         if (overlay) overlay.remove();
         fillCredential(msg.entry);
