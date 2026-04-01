@@ -661,15 +661,6 @@ function renderVaultState() {
     sendMessage('BIOMETRIC_STATUS').then(res => {
       if (res?.enabled) {
         biometricUnlockContainer?.classList.remove('hidden');
-        // Auto-trigger biometric unlock for better UX
-        if (!state.biometricAutoTriggered) {
-          state.biometricAutoTriggered = true;
-          setTimeout(() => {
-            if (!state.vaultUnlocked && biometricUnlockBtn) {
-              biometricUnlockBtn.click();
-            }
-          }, 600);
-        }
       } else {
         biometricUnlockContainer?.classList.add('hidden');
       }
