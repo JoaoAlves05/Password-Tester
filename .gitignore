@@ -1,35 +1,7 @@
-# Artefactos de build / Node
-node_modules/
-dist/
-build/
-.npm/
-
-# Chrome extension packaging
-*.crx
-*.zip
-
-# Ambiente virtual / Python (mantido por segurança)
-.venv/
-venv/
-env/
-
-# Testes / cobertura (artefactos locais)
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Variáveis de ambiente e ficheiros secretos
+# Variáveis de ambiente
 .env
 .env.*
 !.env.example
-
-# Logs e bases de dados locais
-*.log
-*.sqlite3
-*.db
 
 # IDEs e editores
 .vscode/
