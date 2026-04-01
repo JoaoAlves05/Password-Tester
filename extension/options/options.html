@@ -211,6 +211,14 @@
               <h2>Data Management</h2>
             </div>
             <div class="card">
+              <div class="card-row">
+                <div class="row-info full-width">
+                  <label class="row-label">Biometric Unlock (Info)</label>
+                  <p class="row-sub">If you enable biometric unlock, your master passphrase is encrypted with a device-bound WebAuthn PRF and stored only as ciphertext. The plaintext passphrase is NOT persisted. After a browser restart or service worker update, you'll need to authenticate with your device biometric (or enter the master password manually) to unlock the vault. This is an opt-in feature that improves security by avoiding plaintext storage.</p>
+                </div>
+              </div>
+            </div>
+            <div class="card">
               <button type="button" id="resetSettings" class="card-action-btn">
                 <div class="btn-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
