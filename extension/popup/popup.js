@@ -4,6 +4,12 @@ import { loadSettings, saveSettings } from '../src/settings.js';
 function bufferToBase64(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)));
 }
+function base64ToBuffer(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
 
 const ICONS = {
   sun:
@@ -88,6 +94,8 @@ const vaultLockedPanel = document.getElementById('vaultLocked');
 const vaultUnlockedPanel = document.getElementById('vaultUnlocked');
 const createMasterSection = document.getElementById('createMaster');
 const unlockMasterSection = document.getElementById('unlockMaster');
+const biometricUnlockContainer = document.getElementById('biometricUnlockContainer');
+const biometricUnlockBtn = document.getElementById('biometricUnlockBtn');
 const createMasterForm = document.getElementById('createMasterForm');
 const unlockForm = document.getElementById('unlockForm');
 const vaultPassphraseInput = document.getElementById('vaultPassphrase');
@@ -131,7 +139,8 @@ const state = {
   generatorPassword: '',
   inactivityTimer: null,
   currentView: 'tester',
-  editingEntryId: null
+  editingEntryId: null,
+  biometricAutoTriggered: false
 };
 
 function systemPrefersDark() {
@@ -646,7 +655,26 @@ function renderVaultState() {
   if (vaultUnlockedPanel) vaultUnlockedPanel.classList.toggle('hidden', showLocked);
   if (createMasterSection) createMasterSection.classList.toggle('hidden', state.vaultInitialized !== false);
   if (unlockMasterSection) unlockMasterSection.classList.toggle('hidden', !state.vaultInitialized);
-  if (!state.vaultUnlocked) {
+  
+  if (!state.vaultUnlocked && state.vaultInitialized) {
+    // Check if biometric is enabled to show the unlock option
+    sendMessage('BIOMETRIC_STATUS').then(res => {
+      if (res?.enabled) {
+        biometricUnlockContainer?.classList.remove('hidden');
+        // Auto-trigger biometric unlock for better UX
+        if (!state.biometricAutoTriggered) {
+          state.biometricAutoTriggered = true;
+          setTimeout(() => {
+            if (!state.vaultUnlocked && biometricUnlockBtn) {
+              biometricUnlockBtn.click();
+            }
+          }, 600);
+        }
+      } else {
+        biometricUnlockContainer?.classList.add('hidden');
+      }
+    });
+
     if (vaultSearch) vaultSearch.value = '';
     if (searchContainer) searchContainer.classList.remove('active');
     state.filter = '';
@@ -1112,6 +1140,74 @@ function attachEventListeners() {
 
   createMasterForm.addEventListener('submit', handleCreateMaster);
   unlockForm.addEventListener('submit', handleUnlock);
+  if (biometricUnlockBtn) {
+    biometricUnlockBtn.addEventListener('click', async () => {
+      biometricUnlockBtn.disabled = true;
+      const span = biometricUnlockBtn.querySelector('span');
+      const originalText = span.textContent;
+      span.textContent = 'Authenticating...';
+
+      try {
+        // 1. Get current biometric credential info from background
+        const statusRes = await sendMessage('BIOMETRIC_STATUS');
+        if (!statusRes?.enabled) throw new Error('Biometric unlock is not enabled.');
+
+        // 2. Start biometric session in background
+        const startRes = await sendMessage('BIOMETRIC_AUTH_START', { credentialId: null });
+        if (!startRes?.ok) throw new Error(startRes?.error || 'Failed to start biometric auth');
+
+        // 3. Trigger native dialog directly from extension popup
+        // Note: we can do this here because popup is extension origin
+        const bioDataRes = await chrome.storage.local.get('securepassBiometric');
+        const b = bioDataRes.securepassBiometric;
+        if (!b) throw new Error('Stored biometric data not found.');
+
+        const rpId = chrome.runtime.id;
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+        const assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            rpId,
+            allowCredentials: [{ 
+              type: 'public-key', 
+              id: base64ToBuffer(b.credentialId),
+              transports: ['internal']
+            }],
+            userVerification: 'required',
+            extensions: {
+              prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
+            },
+          },
+        });
+
+        const prfResults = assertion.getClientExtensionResults()?.prf?.results;
+        const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
+
+        // 4. Send PRF results to background to complete unlock
+        const completeRes = await sendMessage('BIOMETRIC_AUTH_COMPLETE', {
+          sessionId: startRes.sessionId,
+          prfOutput,
+          prfAvailable: !!prfOutput
+        });
+
+        if (completeRes?.ok) {
+          showToast('Vault unlocked!', 'success');
+          await loadVaultStatus();
+        } else {
+          throw new Error(completeRes?.error || 'Authentication failed');
+        }
+      } catch (err) {
+        console.error('Biometric Unlock Error:', err);
+        if (err.name !== 'NotAllowedError') {
+          showToast(err.message || 'Biometric authentication failed.', 'error');
+        }
+      } finally {
+        biometricUnlockBtn.disabled = false;
+        span.textContent = originalText;
+      }
+    });
+  }
   entryForm.addEventListener('submit', handleEntrySubmit);
   masterForm.addEventListener('submit', changeMasterPassword);
 
