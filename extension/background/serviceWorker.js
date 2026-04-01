@@ -280,10 +280,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'BIOMETRIC_REGISTER_COMPLETE': {
         // Called by popup.js after successful credential creation
-        const { credentialId, prfOutput, prfAvailable } = message;
+        const { credentialId, prfOutput, prfAvailable, passphrase } = message;
         try {
-          const vaultSession = await chrome.storage.session.get('vaultPassphrase');
-          const passphrase = vaultSession.vaultPassphrase;
           let encryptedPassphrase = null;
           if (prfAvailable && prfOutput && passphrase) {
             encryptedPassphrase = await encryptPassphraseWithPRF(passphrase, prfOutput);
@@ -333,7 +331,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           let entry = null;
           let unlockError = null;
           try {
-            // 1. Try PRF-based unlock
+            // 1. Try PRF-based unlock (biometric)
             if (prfAvailable && prfOutput) {
               const biometricData = await getBiometricData();
               if (biometricData?.encryptedPassphrase) {
@@ -341,12 +339,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 await unlockVault(pass);
               }
             }
-            // 2. Fallback: use session passphrase if vault still locked
+            // 2. If still locked, require manual unlock (do not fallback to plaintext session storage)
             const status = await vaultStatus();
             if (!status.unlocked) {
-              const vs = await chrome.storage.session.get('vaultPassphrase');
-              if (vs.vaultPassphrase) await unlockVault(vs.vaultPassphrase);
-              else throw new Error('Vault locked. Please use master password.');
+              throw new Error('Vault locked. Please enter your master password.');
             }
             // 3. Retrieve requested credential
             const entries = await listCredentials();

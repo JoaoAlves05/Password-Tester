@@ -903,15 +903,11 @@ async function loadVaultStatus() {
   if (!response?.ok) return;
   state.vaultInitialized = response.status?.initialized ?? false;
   if (response.status?.unlocked) {
-    // Vault is already unlocked in the service worker — restore state in the popup
+    // Vault is unlocked in the service worker. For security we do not restore
+    // the plaintext passphrase into the popup automatically. Sensitive actions
+    // will require the user to re-enter the master password or use biometric unlock.
     state.vaultUnlocked = true;
-    // Recover the passphrase from session storage so operations that need it work
-    try {
-      const session = await chrome.storage.session.get('vaultPassphrase');
-      if (session.vaultPassphrase) {
-        state.passphrase = session.vaultPassphrase;
-      }
-    } catch {}
+    state.passphrase = null;
     renderVaultState();
     await refreshVaultEntries();
     resetInactivityTimer();
@@ -1444,7 +1440,8 @@ function attachEventListeners() {
           const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
             credentialId: bufferToBase64(credential.rawId),
             prfOutput,
-            prfAvailable: !!prfOutput
+            prfAvailable: !!prfOutput,
+            passphrase: state.passphrase
           });
 
           if (res?.ok) {
