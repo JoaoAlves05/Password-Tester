@@ -1,9 +1,19 @@
-# Ambiente Virtual (Dependências do Python)
+# Artefactos de build / Node
+node_modules/
+dist/
+build/
+.npm/
+
+# Chrome extension packaging
+*.crx
+*.zip
+
+# Ambiente virtual / Python (mantido por segurança)
 .venv/
 venv/
 env/
 
-# Ficheiros de Python e Cache (Testes e Execução)
+# Testes / cobertura (artefactos locais)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -11,28 +21,22 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Variáveis de Ambiente e Chaves Secretas
+# Variáveis de ambiente e ficheiros secretos
 .env
 .env.*
 !.env.example
 
-# Bases de Dados e Registos
+# Logs e bases de dados locais
 *.log
 *.sqlite3
 *.db
 
-# Frontend / Web / Extensão (JavaScript e Node.js)
-node_modules/
-dist/
-build/
-.npm/
-
-# IDE e Editores de Texto
+# IDEs e editores
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Sistema Operativo (Windows e macOS)
+# Sistema operativo
 .DS_Store
 Thumbs.db
