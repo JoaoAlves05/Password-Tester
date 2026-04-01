@@ -436,7 +436,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'clearClipboard') {
     await clearClipboardFromBackground();
   } else if (alarm.name === 'vaultAutoLock') {
-    lockVault();
+    try {
+      const session = await chrome.storage.session.get('vaultTimeoutMinutes');
+      const timeoutSecs = Math.max(60, (session.vaultTimeoutMinutes || 15) * 60);
+
+      chrome.idle.queryState(timeoutSecs, async (state) => {
+        if (state === 'locked' || state === 'idle') {
+          lockVault();
+        } else {
+          // User is active, postpone lock!
+          await keepAlive();
+        }
+      });
+    } catch {
+      lockVault(); // fallback
+    }
   }
 });
 

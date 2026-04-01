@@ -195,18 +195,21 @@ async function updateActivity(timeoutMinutes) {
   
   // Update session storage
   try {
-    // We only update timestamp, assuming passphrase is already there
+    // We only update timestamp
     await chrome.storage.session.set({ 
       vaultLastActivity: now,
       vaultTimeoutMinutes: timeoutMinutes 
     });
+
+    // Make auto-lock smarter: Configure OS-level idle/lock detection
+    const timeoutSeconds = Math.max(60, timeoutMinutes * 60); // minimum 60s
+    chrome.idle.setDetectionInterval(timeoutSeconds);
+
   } catch (e) {
-    console.error('Failed to update session activity:', e);
+    console.error('Failed to configure idle detection:', e);
   }
 
-  // Reset Alarm
-  // We set the alarm to fire when the timeout expires from NOW.
-  // This ensures that even if the browser is open but SW is idle, the alarm will wake it up to lock.
+  // Backup alarm in case idle API is flaky or SW shuts down
   try {
     await chrome.alarms.create(ALARM_NAME, { delayInMinutes: timeoutMinutes });
   } catch (e) {
