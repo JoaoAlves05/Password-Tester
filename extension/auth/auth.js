@@ -22,7 +22,7 @@ async function triggerWebAuthn() {
     const rpId = chrome.runtime.id;
 
     const allowCreds = data.credentialId
-      ? [{ type: 'public-key', id: base64ToBuffer(data.credentialId) }]
+      ? [{ type: 'public-key', id: base64ToBuffer(data.credentialId), transports: ['internal'] }]
       : [];
 
     const assertion = await navigator.credentials.get({
