@@ -380,6 +380,7 @@ Contributions are welcome! Please follow these guidelines:
 3. Keep pull requests focused and small.
 4. If you touch any cryptographic logic, include tests or a clear manual verification procedure.
 5. Submit a PR with a clear description of what changed and why.
+# Note: Fork this repository on GitHub first. Then replace `<your-username>` below with your GitHub username when cloning your fork.
 
 ```bash
 # Clone your fork
