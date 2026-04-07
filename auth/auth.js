@@ -47,7 +47,10 @@ async function triggerWebAuthn() {
       prfAvailable: !!prfOutput,
     });
   } catch (err) {
-    chrome.runtime.sendMessage({ type: 'BIOMETRIC_CANCELLED', sessionId });
+    const error = err?.name === 'NotAllowedError' || err?.name === 'AbortError'
+      ? 'Authentication cancelled.'
+      : (err?.message || 'Biometric authentication failed.');
+    chrome.runtime.sendMessage({ type: 'BIOMETRIC_CANCELLED', sessionId, error });
   }
 }
 

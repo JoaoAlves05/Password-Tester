@@ -14,6 +14,7 @@ const ALARM_NAME = 'vaultAutoLock';
 const PRF_EVAL_LABEL = 'securepass-master-key-v1';
 
 let cache = { data: null };
+let unlockedPassphrase = null;
 
 let bruteForceAttempts = 0;
 let lockoutUntil = 0;
@@ -271,7 +272,7 @@ function normalizeEntry(partial, existing) {
 }
 
 async function writeVault(data, passphrase) {
-  const pass = passphrase;
+  const pass = passphrase || unlockedPassphrase;
   if (!pass) throw new Error('Passphrase required to write vault');
 
   const record = await encryptData(data, pass);
@@ -300,6 +301,7 @@ export async function initializeVault(passphrase) {
   const payload = await encryptData({ entries: [] }, passphrase);
   await saveVaultRecord(payload);
   cache.data = { entries: [] };
+  unlockedPassphrase = passphrase;
   const settings = await loadSettings();
   
   const timeout = settings.vaultTimeout || 15;
@@ -343,6 +345,7 @@ export async function unlockVault(passphrase, timeoutMinutes = 15) {
     throw new Error('Invalid master password');
   }
   cache.data = data;
+  unlockedPassphrase = passphrase;
   // Do not persist the plaintext passphrase in session storage for security.
   try {
     await updateActivity(timeoutMinutes);
@@ -363,6 +366,7 @@ export async function lockVault() {
     }
   }
   cache.data = null;
+  unlockedPassphrase = null;
   
   try {
     await chrome.storage.session.remove(['vaultLastActivity', 'vaultTimeoutMinutes']);
@@ -379,7 +383,7 @@ export async function storeCredential(entry, passphrase) {
   const normalized = normalizeEntry(entry);
   data.entries = data.entries || [];
   data.entries.push(normalized);
-  const pass = passphrase;
+  const pass = passphrase || unlockedPassphrase;
   if (!pass) throw new Error('Passphrase required');
 
   await writeVault(data, pass);
@@ -398,7 +402,7 @@ export async function updateCredential(id, updates, passphrase) {
   if (index === -1) throw new Error('Credential not found');
   const updated = normalizeEntry({ ...updates, id }, data.entries[index]);
   data.entries[index] = updated;
-  const pass = passphrase;
+  const pass = passphrase || unlockedPassphrase;
   if (!pass) throw new Error('Passphrase required');
 
   await writeVault(data, pass);
@@ -416,7 +420,7 @@ export async function deleteCredential(id, passphrase) {
   const index = data.entries.findIndex(item => item.id === id);
   if (index === -1) throw new Error('Credential not found');
   data.entries.splice(index, 1);
-  const pass = passphrase;
+  const pass = passphrase || unlockedPassphrase;
   if (!pass) throw new Error('Passphrase required');
 
   await writeVault(data, pass);
@@ -433,14 +437,19 @@ export async function changeMasterPassword(oldPassphrase, newPassphrase) {
     throw new Error('Vault not initialized');
   }
   let data;
+  const currentPassphrase = oldPassphrase || unlockedPassphrase;
+  if (!currentPassphrase) {
+    throw new Error('Current master password required');
+  }
   try {
-    data = await decryptData(record, oldPassphrase);
+    data = await decryptData(record, currentPassphrase);
   } catch (error) {
     throw new Error('Invalid current master password');
   }
   const newRecord = await encryptData(data, newPassphrase);
   await saveVaultRecord(newRecord);
   cache.data = data;
+  unlockedPassphrase = newPassphrase;
   
   const settings = await loadSettings();
   const timeout = settings.vaultTimeout || 15;
@@ -482,7 +491,7 @@ export async function importVaultData(data, passphrase) {
 
   await ensureUnlocked(passphrase, timeout);
 
-  const pass = passphrase;
+  const pass = passphrase || unlockedPassphrase;
   if (!pass) throw new Error('Passphrase required to import');
 
   const currentData = cache.data;

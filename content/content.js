@@ -1,6 +1,114 @@
 (async () => {
   const AUTO_SUBMIT_ENABLED = true;
 
+  function bufferToBase64(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  }
+
+  function base64ToBuffer(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  async function runBiometricAssertion(credentialId, sessionId) {
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: chrome.runtime.id,
+          allowCredentials: credentialId ? [{
+            type: 'public-key',
+            id: base64ToBuffer(credentialId),
+            transports: ['internal']
+          }] : [],
+          userVerification: 'required',
+          extensions: {
+            prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
+          },
+        },
+      });
+
+      const prfResults = assertion.getClientExtensionResults()?.prf?.results;
+      const prfOutput = prfResults?.first ? bufferToBase64(prfResults.first) : null;
+
+      return await new Promise(resolve => {
+        chrome.runtime.sendMessage({
+          type: 'BIOMETRIC_AUTH_COMPLETE',
+          sessionId,
+          prfOutput,
+          prfAvailable: !!prfOutput
+        }, resolve);
+      });
+    } catch (error) {
+      const errorMessage = error?.name === 'NotAllowedError' || error?.name === 'AbortError'
+        ? 'Authentication cancelled.'
+        : (error?.message || 'Biometric authentication failed.');
+      await new Promise(resolve => {
+        chrome.runtime.sendMessage({ type: 'BIOMETRIC_CANCELLED', sessionId, error: errorMessage }, resolve);
+      });
+      throw error;
+    }
+  }
+
+  async function tryBiometricUnlock(credentialId) {
+    const status = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ type: 'BIOMETRIC_STATUS' }, response => {
+        resolve(response);
+      });
+    });
+
+    if (!status?.ok || !status.enabled) {
+      return false;
+    }
+
+    const startRes = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ type: 'BIOMETRIC_AUTH_START', credentialId }, resolve);
+    });
+
+    if (!startRes?.ok) {
+      return false;
+    }
+
+    const sessionId = startRes.sessionId;
+    const authIframe = document.createElement('iframe');
+    authIframe.className = 'securepass-auth-iframe';
+    authIframe.src = chrome.runtime.getURL(`auth/auth.html?sessionId=${sessionId}&mode=authenticate`);
+    authIframe.style.cssText = 'width:0;height:0;border:none;position:absolute;';
+    authIframe.allow = 'publickey-credentials-get *';
+    document.documentElement.appendChild(authIframe);
+
+    try {
+      const result = await new Promise(resolve => {
+        const timeoutId = setTimeout(() => {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve({ ok: false, error: 'Biometric authentication timed out.' });
+        }, 30000);
+
+        const listener = (msg) => {
+          if (msg.type !== 'BIOMETRIC_FILL_RESULT') return;
+          if (msg.sessionId !== sessionId) return;
+          clearTimeout(timeoutId);
+          chrome.runtime.onMessage.removeListener(listener);
+          if (msg.entry) {
+            resolve({ ok: true, entry: msg.entry });
+          } else {
+            resolve({ ok: false, error: msg.error || 'Authentication failed.' });
+          }
+        };
+
+        chrome.runtime.onMessage.addListener(listener);
+      });
+
+      return result;
+    } finally {
+      authIframe.remove();
+    }
+  }
+
   const shadowHost = document.createElement('div');
   shadowHost.id = 'securepass-extension-root';
   shadowHost.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; overflow: visible;';
@@ -831,7 +939,7 @@
           }
         }
       }
-      statusEl.textContent = 'Preenchido!';
+      statusEl.textContent = 'Filled!';
       statusEl.style.color = '#22c55e';
       setTimeout(() => {
         cleanup();
@@ -842,7 +950,7 @@
     }
 
     // Helper: show inline auth overlay (master password + biometric)
-    function showAuthOverlay(credentialId) {
+    function showAuthOverlay(credentialId, initialError = '') {
       // Remove any existing overlay
       const existing = panel.querySelector('.securepass-auth-overlay');
       if (existing) existing.remove();
@@ -850,7 +958,6 @@
       const overlay = document.createElement('div');
       overlay.className = 'securepass-auth-overlay';
 
-      // Build biometric button HTML only if it might be available
       // Build biometric button HTML only if it might be available
       const bioHtml = `
         <div id="sp-bio-container" style="display: none; width: 100%; flex-direction: column; gap: 10px; align-items: center;">
@@ -860,19 +967,19 @@
               <rect x="3" y="13" width="18" height="8" rx="2"/>
               <circle cx="12" cy="8" r="5" stroke-dasharray="3 2"/>
             </svg>
-            Tentar biometria novamente
+            Try Biometric Again
           </button>
           <button type="button" id="sp-show-manual" class="securepass-btn" style="width:100%;gap:8px;background:transparent;border-color:transparent;color:var(--sp-text-secondary);" tabindex="0">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
             </svg>
-            Usar Master Password
+            Use Master Password
           </button>
         </div>
       `;
 
       overlay.innerHTML = `
-        <button type="button" class="securepass-auth-close" id="sp-auth-close" title="Fechar">
+        <button type="button" class="securepass-auth-close" id="sp-auth-close" title="Close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -880,24 +987,24 @@
         <svg width="32" height="32" id="sp-auth-icon" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <h4 id="sp-auth-title">Confirma a tua identidade</h4>
+        <h4 id="sp-auth-title">Verify Your Identity</h4>
         <div class="securepass-auth-error" id="sp-auth-error" style="margin: 0; text-align: center; width: 100%;"></div>
         
         ${bioHtml}
 
         <div id="sp-manual-container" style="display: flex; flex-direction: column; width: 100%; gap: 12px; align-items: center;">
-          <p style="margin: 0;">Insere a master password.</p>
+          <p style="margin: 0;">Enter your master password.</p>
           <div class="securepass-auth-input-wrap">
             <input type="password" class="securepass-auth-input" id="sp-auth-pass"
               placeholder="Master password" autocomplete="current-password" tabindex="0">
-            <button type="button" class="securepass-icon-btn" id="sp-auth-vis" title="Mostrar">
+            <button type="button" class="securepass-icon-btn" id="sp-auth-vis" title="Show">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
               </svg>
             </button>
           </div>
           <button type="button" id="sp-auth-confirm" class="securepass-btn primary" style="width:100%;" tabindex="0">
-            Desbloquear e preencher
+            Unlock and Fill
           </button>
         </div>
       `;
@@ -927,7 +1034,21 @@
       const closeBtn  = overlay.querySelector('#sp-auth-close');
       const bioBtn    = overlay.querySelector('#sp-bio-btn');
 
-      closeBtn.addEventListener('click', () => overlay.remove());
+      if (initialError) {
+        errorEl.textContent = initialError;
+      }
+
+      const resetBiometricAttempt = () => {
+        activeBiometricSessionId = null;
+        bioBtn.disabled = false;
+        const authIframe = overlay.querySelector('.securepass-auth-iframe');
+        if (authIframe) authIframe.remove();
+      };
+
+      closeBtn.addEventListener('click', () => {
+        resetBiometricAttempt();
+        overlay.remove();
+      });
       visBtn.addEventListener('click', () => {
         passInput.type = passInput.type === 'password' ? 'text' : 'password';
       });
@@ -937,7 +1058,7 @@
         const pass = passInput.value.trim();
         if (!pass) { passInput.classList.add('shake'); setTimeout(() => passInput.classList.remove('shake'), 400); return; }
         confirmBtn.disabled = true;
-        confirmBtn.textContent = 'A verificar…';
+        confirmBtn.textContent = 'Verifying...';
         errorEl.textContent = '';
 
         const res = await new Promise(r =>
@@ -952,21 +1073,21 @@
           passInput.value = '';
           passInput.classList.add('shake');
           setTimeout(() => passInput.classList.remove('shake'), 400);
-          errorEl.textContent = res?.error || 'Password incorreta.';
+          errorEl.textContent = res?.error || 'Incorrect password.';
           if (attempts >= 3) {
             confirmBtn.disabled = true;
             if (bioBtn) bioBtn.disabled = true;
-            errorEl.textContent = 'Demasiadas tentativas. Aguarda 30s.';
+            errorEl.textContent = 'Too many attempts. Please wait 30 seconds.';
             setTimeout(() => {
               confirmBtn.disabled = false;
               if (bioBtn) bioBtn.disabled = false;
               attempts = 0;
               errorEl.textContent = '';
-              confirmBtn.textContent = 'Desbloquear e preencher';
+              confirmBtn.textContent = 'Unlock and Fill';
             }, 30000);
           } else {
             confirmBtn.disabled = false;
-            confirmBtn.textContent = 'Desbloquear e preencher';
+            confirmBtn.textContent = 'Unlock and Fill';
           }
         }
       }
@@ -980,16 +1101,14 @@
       const manualContainer = overlay.querySelector('#sp-manual-container');
       const showManualBtn = overlay.querySelector('#sp-show-manual');
 
-      if (bioBtn) {
-        chrome.runtime.sendMessage({ type: 'BIOMETRIC_STATUS' }, res => {
-          if (res?.ok && res.enabled) {
-            bioContainer.style.display = 'flex';
-            manualContainer.style.display = 'none';
-            // Auto-trigger biometric dialog!
-            setTimeout(() => bioBtn.click(), 100);
-          }
-        });
+      chrome.runtime.sendMessage({ type: 'BIOMETRIC_STATUS' }, res => {
+        if (res?.ok && res.enabled) {
+          bioContainer.style.display = 'flex';
+          manualContainer.style.display = 'none';
+        }
+      });
 
+      if (bioBtn) {
         if (showManualBtn) {
           showManualBtn.addEventListener('click', () => {
             bioContainer.style.display = 'none';
@@ -999,25 +1118,27 @@
         }
 
         bioBtn.addEventListener('click', async () => {
-          if (activeBiometricSessionId) return; // already pending
+          resetBiometricAttempt();
           bioBtn.disabled = true;
-          bioBtn.innerHTML = `A aguardar biometria...`;
           errorEl.textContent = '';
           const res = await new Promise(r =>
             chrome.runtime.sendMessage({ type: 'BIOMETRIC_AUTH_START', credentialId }, r)
           );
           if (!res?.ok) {
             bioBtn.disabled = false;
-            bioBtn.innerHTML = `Tentar biometria novamente`;
-            errorEl.textContent = res?.error || 'Erro ao iniciar biometria.';
+            errorEl.textContent = res?.error || 'Unable to start biometric authentication.';
           } else {
             activeBiometricSessionId = res.sessionId;
-            const authIframe = document.createElement('iframe');
-            authIframe.className = 'securepass-auth-iframe';
-            authIframe.src = chrome.runtime.getURL(`auth/auth.html?sessionId=${res.sessionId}&mode=authenticate`);
-            authIframe.style.cssText = 'width:0;height:0;border:none;position:absolute;';
-            authIframe.allow = "publickey-credentials-get *";
-            overlay.appendChild(authIframe);
+            try {
+              const completeRes = await runBiometricAssertion(credentialId, res.sessionId);
+              if (!completeRes?.ok) {
+                throw new Error(completeRes?.error || 'Authentication failed.');
+              }
+            } catch (err) {
+              activeBiometricSessionId = null;
+              bioBtn.disabled = false;
+              errorEl.textContent = err?.message || 'Authentication cancelled.';
+            }
           }
         });
       }
@@ -1026,7 +1147,7 @@
     // Listen for biometric fill result from background
     const biometricResultListener = (msg) => {
       if (msg.type !== 'BIOMETRIC_FILL_RESULT') return;
-      if (activeBiometricSessionId && msg.sessionId !== activeBiometricSessionId) return;
+      if (!activeBiometricSessionId || msg.sessionId !== activeBiometricSessionId) return;
       activeBiometricSessionId = null;
       const overlay = panel.querySelector('.securepass-auth-overlay');
       const authIframe = overlay?.querySelector('.securepass-auth-iframe');
@@ -1037,11 +1158,10 @@
         fillCredential(msg.entry);
       } else {
         const errorEl = overlay?.querySelector('#sp-auth-error');
-        if (errorEl) errorEl.textContent = msg.error || 'Autenticação falhada.';
+        if (errorEl) errorEl.textContent = msg.error || 'Authentication failed.';
         const bioBtn = overlay?.querySelector('#sp-bio-btn');
         if (bioBtn) { 
           bioBtn.disabled = false; 
-          bioBtn.innerHTML = `Tentar biometria novamente`; 
         }
       }
     };
@@ -1061,7 +1181,7 @@
       });
 
       if (!matches.length) {
-        if (isLogin) statusEl.textContent = 'Nenhuma password guardada para este site.';
+        if (isLogin) statusEl.textContent = 'No saved password for this site.';
         return;
       }
 
@@ -1078,7 +1198,7 @@
             </svg>
           </div>
           <div class="securepass-stub-info">
-            <div class="securepass-stub-user">${m.username || 'Sem utilizador'}</div>
+            <div class="securepass-stub-user">${m.username || 'No username'}</div>
             <div class="securepass-stub-site">${host}</div>
           </div>
           <span class="securepass-stub-action">
@@ -1090,7 +1210,7 @@
             </svg>
           </span>
         `;
-        stub.addEventListener('click', () => {
+        stub.addEventListener('click', async () => {
           if (vaultUnlocked) {
             // Vault already open: fetch directly
             const fullEntry = unlockedEntries?.find(e => e.id === m.id);
@@ -1098,10 +1218,19 @@
             // Shouldn't happen, but fallback
             chrome.runtime.sendMessage({ type: 'GET_CREDENTIAL', credentialId: m.id }, res => {
               if (res?.ok && res.entry) fillCredential(res.entry);
-              else showAuthOverlay(m.id);
+              else showAuthOverlay(m.id, 'Biometric authentication failed.');
             });
           } else {
-            showAuthOverlay(m.id);
+            try {
+              const biometricRes = await tryBiometricUnlock(m.id);
+              if (biometricRes?.ok && biometricRes.entry) {
+                fillCredential(biometricRes.entry);
+                return;
+              }
+              showAuthOverlay(m.id, biometricRes?.error || 'Biometric authentication failed.');
+            } catch {
+              showAuthOverlay(m.id, 'Biometric authentication failed.');
+            }
           }
         });
         list.appendChild(stub);
@@ -1130,7 +1259,7 @@
           }));
           renderStubs(fullMeta, fullRes.entries);
         } else if (!meta.length && isLogin) {
-          statusEl.textContent = 'Nenhuma password guardada para este site.';
+          statusEl.textContent = 'No saved password for this site.';
         }
       });
     });

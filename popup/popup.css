@@ -1956,6 +1956,7 @@ body[data-theme='dark'] .divider {
   width: 100%;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 14px 16px;
   background: transparent;
@@ -1964,6 +1965,11 @@ body[data-theme='dark'] .divider {
   text-align: left;
   transition: all 0.2s ease;
   border-radius: 0;
+}
+
+.card-action-btn[role='button']:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .card-action-btn:hover {
@@ -2030,6 +2036,92 @@ body[data-theme='dark'] .btn-icon {
 
 .card-action-btn.danger .btn-label {
   color: var(--danger);
+}
+
+.biometric-inline-auth {
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 8px 2px;
+  margin-top: 0;
+  transform: translateY(-4px);
+  transition: max-height 0.26s ease, opacity 0.2s ease, transform 0.2s ease, margin-top 0.2s ease;
+}
+
+.card-action-btn.inline-auth-open .biometric-inline-auth {
+  max-height: 180px;
+  opacity: 1;
+  margin-top: 8px;
+  transform: translateY(0);
+}
+
+.biometric-inline-auth .field-group {
+  gap: 4px;
+}
+
+.biometric-inline-auth .field-group label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.biometric-inline-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.biometric-inline-actions .compact-btn {
+  flex: 1;
+}
+
+#biometricSetupBtn.card-action-btn {
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+#biometricSetupBtn .btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+#biometricSetupBtn .btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+#biometricSetupBtn .btn-label {
+  font-size: 0.92rem;
+}
+
+#biometricSetupBtn .btn-sub {
+  font-size: 0.76rem;
+}
+
+#biometricSetupBtn .btn-arrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+#biometricSetupBtn .biometric-inline-actions {
+  gap: 6px;
+}
+
+#biometricSetupBtn .biometric-inline-actions .compact-btn {
+  min-height: 34px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+#biometricSetupBtn .biometric-inline-auth {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#biometricSetupBtn .biometric-inline-auth .input-wrapper.has-toggle input {
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 /* About Card */

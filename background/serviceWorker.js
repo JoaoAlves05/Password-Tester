@@ -29,6 +29,21 @@ function bufferToBase64(buffer) {
 }
 
 const pendingSaves = new Map();
+const BIOMETRIC_SESSION_PASSPHRASE_KEY = 'biometricSessionPassphrase';
+
+async function setBiometricSessionPassphrase(passphrase) {
+  if (!passphrase) return;
+  await chrome.storage.session.set({ [BIOMETRIC_SESSION_PASSPHRASE_KEY]: passphrase });
+}
+
+async function getBiometricSessionPassphrase() {
+  const result = await chrome.storage.session.get(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+  return result?.[BIOMETRIC_SESSION_PASSPHRASE_KEY] || '';
+}
+
+async function clearBiometricSessionPassphrase() {
+  await chrome.storage.session.remove(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await loadSettings();
@@ -74,6 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
           await initializeVault(passphrase);
           const data = await unlockVault(passphrase, message.timeoutMinutes);
+          await setBiometricSessionPassphrase(passphrase);
           sendResponse({ ok: true, data });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -174,6 +190,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
           const settings = await loadSettings();
           await unlockVault(passphrase, settings.vaultTimeout || 15);
+          await setBiometricSessionPassphrase(passphrase);
           const entries = await listCredentials();
           // Backfill metadata on unlock
           if (entries.length) syncMetadataFromEntries(entries).catch(() => {});
@@ -198,6 +215,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
           const created = await initializeVault(passphrase);
+          await setBiometricSessionPassphrase(passphrase);
           sendResponse({ ok: true, created });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -209,6 +227,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const oldPassphrase = validateString(message.oldPassphrase, 1024, 'oldPassphrase', true);
           const newPassphrase = validateString(message.newPassphrase, 1024, 'newPassphrase', true);
           await changeMasterPassword(oldPassphrase, newPassphrase);
+          await setBiometricSessionPassphrase(newPassphrase);
           sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -275,6 +294,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       case 'DISABLE_BIOMETRIC': {
         await clearBiometricData();
+        await clearBiometricSessionPassphrase();
         sendResponse({ ok: true });
         break;
       }
@@ -285,6 +305,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           let encryptedPassphrase = null;
           if (prfAvailable && prfOutput && passphrase) {
             encryptedPassphrase = await encryptPassphraseWithPRF(passphrase, prfOutput);
+          }
+          if (passphrase) {
+            await setBiometricSessionPassphrase(passphrase);
           }
           await saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable);
           sendResponse({ ok: true, prfAvailable });
@@ -337,14 +360,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               if (biometricData?.encryptedPassphrase) {
                 const pass = await decryptPassphraseWithPRF(biometricData.encryptedPassphrase, prfOutput);
                 await unlockVault(pass);
+                await setBiometricSessionPassphrase(pass);
               }
             }
-            // 2. If still locked, require manual unlock (do not fallback to plaintext session storage)
-            const status = await vaultStatus();
+
+            // 2. Fallback for non-PRF authenticators: unlock using session passphrase
+            let status = await vaultStatus();
             if (!status.unlocked) {
-              throw new Error('Vault locked. Please enter your master password.');
+              const sessionPassphrase = await getBiometricSessionPassphrase();
+              if (sessionPassphrase) {
+                await unlockVault(sessionPassphrase);
+              }
+              status = await vaultStatus();
             }
-            // 3. Retrieve requested credential
+
+            // 3. If still locked, prompt manual unlock once to seed session fallback
+            if (!status.unlocked) {
+              throw new Error('Biometric unlock needs one successful master-password unlock in this browser session.');
+            }
+
+            // 4. Retrieve requested credential
             const entries = await listCredentials();
             entry = requestedCredentialId ? entries.find(e => e.id === requestedCredentialId) : null;
           } catch (e) {
@@ -367,7 +402,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
       case 'BIOMETRIC_CANCELLED': {
-        const { sessionId } = message;
+        const { sessionId, error } = message;
         const sessionKey = `biometric_${sessionId}`;
         
         try {
@@ -375,7 +410,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const sd = sRes[sessionKey];
           // Notify content script that auth was cancelled
           if (sd?.tabId) {
-            try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: 'Cancelled' }); } catch {}
+            try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: error || 'Authentication cancelled.' }); } catch {}
           }
           await chrome.storage.session.remove(sessionKey);
           sendResponse({ ok: true });

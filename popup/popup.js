@@ -124,10 +124,26 @@ const masterForm = document.getElementById('masterForm');
 const currentMasterInput = document.getElementById('currentMaster');
 const nextMasterInput = document.getElementById('nextMaster');
 const confirmNextMasterInput = document.getElementById('confirmNextMaster');
+const biometricInlineAuth = document.getElementById('biometricInlineAuth');
+const biometricInlinePassword = document.getElementById('biometricInlinePassword');
+const biometricInlineConfirm = document.getElementById('biometricInlineConfirm');
+const biometricInlineCancel = document.getElementById('biometricInlineCancel');
+const unlockSetupModal = document.getElementById('unlockSetupModal');
+const unlockSetupForm = document.getElementById('unlockSetupForm');
+const unlockSetupPassword = document.getElementById('unlockSetupPassword');
+const unlockSetupLead = document.getElementById('unlockSetupLead');
 
 const THEMES = ['system', 'dark', 'light'];
 const revealTimers = new Map();
 let settingsSaveTimeout = null;
+let unlockSetupResolver = null;
+
+function sanitizeValue(value, maxLength = 1024, trim = true) {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  const normalized = trim ? cleaned.trim() : cleaned;
+  return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+}
 
 const state = {
   settings: null,
@@ -682,11 +698,23 @@ function clearEntryForm() {
 }
 
 function closeModal(id) {
-  const modal = id === 'entryModal' ? entryModal : masterModal;
+  const modalMap = {
+    entryModal,
+    masterModal,
+    unlockSetupModal
+  };
+  const modal = modalMap[id];
+  if (!modal) return;
+
+  if (id === 'unlockSetupModal' && unlockSetupResolver) {
+    unlockSetupResolver(null);
+    unlockSetupResolver = null;
+  }
+
   if (!modal.classList.contains('hidden')) {
     modal.classList.add('hidden');
   }
-  if (!entryModal.classList.contains('hidden') || !masterModal.classList.contains('hidden')) {
+  if (!entryModal.classList.contains('hidden') || !masterModal.classList.contains('hidden') || !unlockSetupModal.classList.contains('hidden')) {
     return;
   }
   modalBackdrop.classList.add('hidden');
@@ -694,13 +722,30 @@ function closeModal(id) {
 }
 
 function openModal(id) {
+  const modalMap = {
+    entryModal,
+    masterModal,
+    unlockSetupModal
+  };
+  const modal = modalMap[id];
+  if (!modal) return;
+
   modalBackdrop.classList.remove('hidden');
-  const modal = id === 'entryModal' ? entryModal : masterModal;
   modal.classList.remove('hidden');
   const focusTarget = modal.querySelector('input, textarea, button');
   if (focusTarget) {
     setTimeout(() => focusTarget.focus(), 10);
   }
+}
+
+function promptForMasterPassword(message = 'Enter your master password to continue.') {
+  if (unlockSetupLead) unlockSetupLead.textContent = message;
+  if (unlockSetupForm) unlockSetupForm.reset();
+  openModal('unlockSetupModal');
+
+  return new Promise(resolve => {
+    unlockSetupResolver = resolve;
+  });
 }
 
 async function openEntryModal(entry = null) {
@@ -731,13 +776,43 @@ function openMasterModal() {
 }
 
 function requireUnlockedVault() {
-  if (state.vaultUnlocked && state.passphrase) {
+  if (state.vaultUnlocked) {
     resetInactivityTimer();
     return true;
   }
   showToast('Unlock the vault first to continue.', 'warning');
   setView('vault');
   return false;
+}
+
+async function ensureVaultUnlockedWithPassphrase(promptLabel = 'Enter your master password to continue.') {
+  if (state.vaultUnlocked && state.passphrase) {
+    resetInactivityTimer();
+    return true;
+  }
+
+  const typed = await promptForMasterPassword(promptLabel);
+  const passphrase = (typed || '').trim();
+  if (!passphrase) {
+    showToast('Master password is required.', 'warning');
+    return false;
+  }
+
+  const timeoutMinutes = state.settings?.vaultTimeout || 15;
+  const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+  if (!response?.ok) {
+    showToast(response?.error || 'Unable to unlock vault.', 'error');
+    return false;
+  }
+
+  state.passphrase = passphrase;
+  state.vaultUnlocked = true;
+  state.vaultInitialized = true;
+  state.entries = response.data?.entries || [];
+  renderVaultState();
+  renderVaultEntries();
+  resetInactivityTimer();
+  return true;
 }
 
 async function lockVault(showMessage = false) {
@@ -785,10 +860,10 @@ async function deleteCredential(id) {
 async function handleEntrySubmit(event) {
   event.preventDefault();
   if (!requireUnlockedVault()) return;
-  const site = entrySiteInput.value.trim();
-  const username = entryUsernameInput.value.trim();
-  const password = entryPasswordInput.value.trim();
-  const notes = entryNotesInput.value.trim();
+  const site = sanitizeValue(entrySiteInput.value, 255, true);
+  const username = sanitizeValue(entryUsernameInput.value, 255, true);
+  const password = sanitizeValue(entryPasswordInput.value, 1024, false);
+  const notes = sanitizeValue(entryNotesInput.value, 4096, true);
 
   if (!site) {
     showToast('Website or app is required.', 'warning');
@@ -836,7 +911,7 @@ async function handleEntrySubmit(event) {
 
 async function handleUnlock(event) {
   event.preventDefault();
-  const passphrase = vaultPassphraseInput.value.trim();
+  const passphrase = sanitizeValue(vaultPassphraseInput.value, 1024, false);
   if (!passphrase) return;
   const timeoutMinutes = state.settings?.vaultTimeout || 15;
   const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
@@ -857,8 +932,8 @@ async function handleUnlock(event) {
 
 async function handleCreateMaster(event) {
   event.preventDefault();
-  const master = newMasterInput.value.trim();
-  const confirm = confirmMasterInput.value.trim();
+  const master = sanitizeValue(newMasterInput.value, 1024, false);
+  const confirm = sanitizeValue(confirmMasterInput.value, 1024, false);
   if (!master || !confirm) {
     showToast('Enter and confirm the master password.', 'warning');
     return;
@@ -1002,9 +1077,9 @@ async function saveTestedToVault() {
 async function changeMasterPassword(event) {
   event.preventDefault();
   if (!requireUnlockedVault()) return;
-  const current = currentMasterInput.value.trim();
-  const next = nextMasterInput.value.trim();
-  const confirm = confirmNextMasterInput.value.trim();
+  const current = sanitizeValue(currentMasterInput.value, 1024, false);
+  const next = sanitizeValue(nextMasterInput.value, 1024, false);
+  const confirm = sanitizeValue(confirmNextMasterInput.value, 1024, false);
   if (!current || !next || !confirm) {
     showToast('Complete all fields.', 'warning');
     return;
@@ -1131,8 +1206,6 @@ function attachEventListeners() {
     biometricUnlockBtn.addEventListener('click', async () => {
       biometricUnlockBtn.disabled = true;
       const span = biometricUnlockBtn.querySelector('span');
-      const originalText = span.textContent;
-      span.textContent = 'Authenticating...';
 
       try {
         // 1. Get current biometric credential info from background
@@ -1191,16 +1264,37 @@ function attachEventListeners() {
         }
       } finally {
         biometricUnlockBtn.disabled = false;
-        span.textContent = originalText;
       }
     });
   }
   entryForm.addEventListener('submit', handleEntrySubmit);
   masterForm.addEventListener('submit', changeMasterPassword);
+  if (unlockSetupForm) {
+    unlockSetupForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const passphrase = (unlockSetupPassword?.value || '').trim();
+      if (!passphrase) {
+        showToast('Master password is required.', 'warning');
+        return;
+      }
+
+      const resolver = unlockSetupResolver;
+      unlockSetupResolver = null;
+      if (!unlockSetupModal.classList.contains('hidden')) {
+        unlockSetupModal.classList.add('hidden');
+      }
+      if (entryModal.classList.contains('hidden') && masterModal.classList.contains('hidden') && unlockSetupModal.classList.contains('hidden')) {
+        modalBackdrop.classList.add('hidden');
+      }
+
+      if (resolver) resolver(passphrase);
+    });
+  }
 
   modalBackdrop.addEventListener('click', () => {
     closeModal('entryModal');
     closeModal('masterModal');
+    closeModal('unlockSetupModal');
   });
 
   document.querySelectorAll('[data-close]')?.forEach(button => {
@@ -1214,7 +1308,7 @@ function attachEventListeners() {
     button.addEventListener('click', event => {
       const modal = event.target.closest('.modal');
       if (modal) {
-        closeModal(modal.id === 'entryModal' ? 'entryModal' : 'masterModal');
+        closeModal(modal.id);
       }
     });
   });
@@ -1363,16 +1457,87 @@ function attachEventListeners() {
   const biometricBtnLabel = document.getElementById('biometricBtnLabel');
   const biometricBtnSub   = document.getElementById('biometricBtnSub');
 
+  function collapseBiometricInlineAuth(reset = false) {
+    if (!biometricSetupBtn || !biometricInlineAuth) return;
+    biometricSetupBtn.classList.remove('inline-auth-open');
+    biometricSetupBtn.setAttribute('aria-expanded', 'false');
+    biometricInlineAuth.setAttribute('aria-hidden', 'true');
+    if (reset && biometricInlinePassword) {
+      biometricInlinePassword.value = '';
+    }
+  }
+
+  function expandBiometricInlineAuth() {
+    if (!biometricSetupBtn || !biometricInlineAuth) return;
+    biometricSetupBtn.classList.add('inline-auth-open');
+    biometricSetupBtn.setAttribute('aria-expanded', 'true');
+    biometricInlineAuth.setAttribute('aria-hidden', 'false');
+    biometricBtnLabel.textContent = 'Insert master password';
+    biometricBtnSub.textContent = 'Unlock here to continue biometric setup';
+    setTimeout(() => biometricInlinePassword?.focus(), 80);
+  }
+
+  async function performBiometricSetup() {
+    showToast('Confirma a tua identidade no sistema (Touch ID, PIN, etc.).', 'info');
+    const rpId = chrome.runtime.id;
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { id: rpId, name: 'SecurePass' },
+        user: {
+          id: new TextEncoder().encode('securepass-user'),
+          name: 'SecurePass User',
+          displayName: 'SecurePass',
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 },
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+        },
+        extensions: {
+          prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
+        },
+      },
+    });
+
+    const prfResults = credential.getClientExtensionResults()?.prf?.results;
+    const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
+
+    const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
+      credentialId: bufferToBase64(credential.rawId),
+      prfOutput,
+      prfAvailable: !!prfOutput,
+      passphrase: state.passphrase
+    });
+
+    if (res?.ok) {
+      collapseBiometricInlineAuth(true);
+      showToast('Biometria configurada com sucesso!', 'success');
+      await refreshBiometricBtn();
+      return;
+    }
+
+    throw new Error(res?.error || 'Erro ao configurar biometria.');
+  }
+
   async function refreshBiometricBtn() {
     if (!biometricSetupBtn) return;
     biometricSetupBtn.style.display = '';
+    collapseBiometricInlineAuth(true);
     
     // Get status even if locked
     const res = await sendMessage('BIOMETRIC_STATUS');
     
     if (!state.vaultUnlocked) {
-      biometricBtnLabel.textContent = res?.enabled ? 'Biometric Unlock Active' : 'Set up Biometric Unlock';
-      biometricBtnSub.textContent   = 'Unlock vault first to make changes';
+      biometricBtnLabel.textContent = res?.enabled ? 'Disable Biometric Unlock' : 'Set up Biometric Unlock';
+      biometricBtnSub.textContent   = res?.enabled
+        ? 'Biometric unlock is active. Tap to disable.'
+        : 'Tap to unlock and configure here';
       biometricSetupBtn.classList.remove('danger');
       return;
     }
@@ -1391,7 +1556,8 @@ function attachEventListeners() {
   }
 
   if (biometricSetupBtn) {
-    biometricSetupBtn.addEventListener('click', async () => {
+    biometricSetupBtn.addEventListener('click', async (event) => {
+      if (biometricInlineAuth?.contains(event.target)) return;
       const statusRes = await sendMessage('BIOMETRIC_STATUS');
       if (statusRes?.enabled) {
         // Disable
@@ -1404,58 +1570,75 @@ function attachEventListeners() {
           showToast('Could not disable biometrics.', 'error');
         }
       } else {
-        // Setup: vault must be unlocked
-        if (!requireUnlockedVault()) return;
-        showToast('Confirma a tua identidade no sistema (Touch ID, PIN, etc.).', 'info');
         try {
-          const rpId = chrome.runtime.id;
-          const challenge = crypto.getRandomValues(new Uint8Array(32));
-          
-          const credential = await navigator.credentials.create({
-            publicKey: {
-              challenge,
-              rp: { id: rpId, name: 'SecurePass' },
-              user: {
-                id: new TextEncoder().encode('securepass-user'),
-                name: 'SecurePass User',
-                displayName: 'SecurePass',
-              },
-              pubKeyCredParams: [
-                { type: 'public-key', alg: -7 },
-                { type: 'public-key', alg: -257 },
-              ],
-              authenticatorSelection: {
-                authenticatorAttachment: 'platform',
-                userVerification: 'required',
-              },
-              extensions: {
-                prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
-              },
-            },
-          });
-
-          const prfResults = credential.getClientExtensionResults()?.prf?.results;
-          const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
-          
-          const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
-            credentialId: bufferToBase64(credential.rawId),
-            prfOutput,
-            prfAvailable: !!prfOutput,
-            passphrase: state.passphrase
-          });
-
-          if (res?.ok) {
-            showToast('Biometria configurada com sucesso!', 'success');
-            await refreshBiometricBtn();
-          } else {
-            showToast(res?.error || 'Erro ao configurar biometria.', 'error');
+          if (!state.passphrase) {
+            expandBiometricInlineAuth();
+            return;
           }
+          await performBiometricSetup();
         } catch (err) {
           if (err.name === 'NotAllowedError') {
             showToast('Configuração biométrica cancelada.', 'info');
           } else {
             showToast('Erro: ' + err.message, 'error');
           }
+        }
+      }
+    });
+
+    biometricSetupBtn.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (biometricInlineAuth?.contains(event.target)) return;
+      event.preventDefault();
+      biometricSetupBtn.click();
+    });
+
+    biometricInlineAuth?.addEventListener('click', event => {
+      event.stopPropagation();
+    });
+    biometricInlinePassword?.addEventListener('keydown', async event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      biometricInlineConfirm?.click();
+    });
+    biometricInlineCancel?.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      collapseBiometricInlineAuth(true);
+      refreshBiometricBtn();
+    });
+    biometricInlineConfirm?.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const passphrase = sanitizeValue(biometricInlinePassword?.value || '', 1024, false);
+      if (!passphrase) {
+        showToast('Master password is required.', 'warning');
+        biometricInlinePassword?.focus();
+        return;
+      }
+
+      const timeoutMinutes = state.settings?.vaultTimeout || 15;
+      const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+      if (!unlockRes?.ok) {
+        showToast(unlockRes?.error || 'Unable to unlock vault.', 'error');
+        return;
+      }
+
+      state.passphrase = passphrase;
+      state.vaultUnlocked = true;
+      state.vaultInitialized = true;
+      state.entries = unlockRes.data?.entries || [];
+      renderVaultState();
+      renderVaultEntries();
+      resetInactivityTimer();
+
+      try {
+        await performBiometricSetup();
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          showToast('Configuração biométrica cancelada.', 'info');
+        } else {
+          showToast('Erro: ' + err.message, 'error');
         }
       }
     });

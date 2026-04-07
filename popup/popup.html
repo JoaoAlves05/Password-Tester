@@ -179,7 +179,7 @@
                 <div class="field-group">
                   <label for="newMaster">Create Master Key</label>
                     <div class="input-wrapper has-toggle">
-                      <input type="password" id="newMaster" autocomplete="new-password" required
+                      <input type="password" id="newMaster" autocomplete="new-password" maxlength="1024" required
                         placeholder="Choose a strong password" />
                       <button type="button" class="icon-btn" data-toggle-password="newMaster" aria-label="Show password" tabindex="-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -193,7 +193,7 @@
               <div class="field-group">
                 <label for="confirmMaster">Confirm Master Key</label>
                   <div class="input-wrapper has-toggle">
-                    <input type="password" id="confirmMaster" autocomplete="new-password" required
+                    <input type="password" id="confirmMaster" autocomplete="new-password" maxlength="1024" required
                       placeholder="Repeat password" />
                     <button type="button" class="icon-btn" data-toggle-password="confirmMaster" aria-label="Show password" tabindex="-1">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -214,7 +214,7 @@
                 <div class="field-group">
                   <label for="vaultPassphrase">Master password</label>
                     <div class="input-wrapper has-toggle">
-                      <input type="password" id="vaultPassphrase" autocomplete="current-password" required
+                      <input type="password" id="vaultPassphrase" autocomplete="current-password" maxlength="1024" required
                         placeholder="Enter password" />
                       <button type="button" class="icon-btn" data-toggle-password="vaultPassphrase" aria-label="Show password" tabindex="-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -410,7 +410,7 @@
 
               <div class="divider"></div>
 
-              <button id="biometricSetupBtn" class="card-action-btn" style="display:none;">
+              <div id="biometricSetupBtn" class="card-action-btn" style="display:none;" role="button" tabindex="0" aria-expanded="false">
                 <div class="btn-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v1H9v-1c0-1.657 1.343-3 3-3z"/>
@@ -428,7 +428,25 @@
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </div>
-              </button>
+                <div id="biometricInlineAuth" class="biometric-inline-auth" aria-hidden="true">
+                  <div class="field-group">
+                    <label for="biometricInlinePassword">Master password</label>
+                    <div class="input-wrapper has-toggle">
+                      <input type="password" id="biometricInlinePassword" autocomplete="current-password" maxlength="1024" />
+                      <button type="button" class="icon-btn" data-toggle-password="biometricInlinePassword" aria-label="Show password" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="biometric-inline-actions">
+                    <button type="button" id="biometricInlineCancel" class="secondary compact-btn">Cancel</button>
+                    <button type="button" id="biometricInlineConfirm" class="primary compact-btn">Unlock & Continue</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -599,25 +617,31 @@
             <div class="field-group">
               <label for="entrySite">Website or app</label>
               <div class="input-wrapper">
-                <input type="text" id="entrySite" placeholder="e.g. https://google.com" required />
+                <input type="text" id="entrySite" placeholder="e.g. https://google.com" maxlength="255" required />
               </div>
             </div>
             <div class="field-group">
               <label for="entryUsername">Username</label>
               <div class="input-wrapper">
-                <input type="text" id="entryUsername" placeholder="e.g. user@email.com" />
+                <input type="text" id="entryUsername" placeholder="e.g. user@email.com" maxlength="255" />
               </div>
             </div>
             <div class="field-group">
               <label for="entryPassword">Password</label>
-              <div class="input-wrapper">
-                <input type="text" id="entryPassword" class="font-mono" required />
+              <div class="input-wrapper has-toggle">
+                <input type="password" id="entryPassword" class="font-mono" required maxlength="1024" />
+                <button type="button" class="icon-btn" data-toggle-password="entryPassword" aria-label="Show password" tabindex="-1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
               </div>
             </div>
             <div class="field-group">
               <label for="entryNotes">Notes <span class="optional">(Optional)</span></label>
               <div class="input-wrapper">
-                <textarea id="entryNotes" rows="2" placeholder="PINs, security questions..."></textarea>
+                <textarea id="entryNotes" rows="2" maxlength="4096" placeholder="PINs, security questions..."></textarea>
               </div>
             </div>
           </div>
@@ -650,7 +674,7 @@
             <div class="field-group">
               <label for="currentMaster">Current password</label>
               <div class="input-wrapper has-toggle">
-                <input type="password" id="currentMaster" autocomplete="current-password" required />
+                <input type="password" id="currentMaster" autocomplete="current-password" maxlength="1024" required />
                 <button type="button" class="icon-btn" data-toggle-password="currentMaster" aria-label="Show password" tabindex="-1">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -662,7 +686,7 @@
             <div class="field-group">
               <label for="nextMaster">New password</label>
               <div class="input-wrapper has-toggle">
-                <input type="password" id="nextMaster" autocomplete="new-password" required />
+                <input type="password" id="nextMaster" autocomplete="new-password" maxlength="1024" required />
                 <button type="button" class="icon-btn" data-toggle-password="nextMaster" aria-label="Show password" tabindex="-1">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -674,7 +698,7 @@
             <div class="field-group">
               <label for="confirmNextMaster">Confirm new password</label>
               <div class="input-wrapper has-toggle">
-                <input type="password" id="confirmNextMaster" autocomplete="new-password" required />
+                <input type="password" id="confirmNextMaster" autocomplete="new-password" maxlength="1024" required />
                 <button type="button" class="icon-btn" data-toggle-password="confirmNextMaster" aria-label="Show password" tabindex="-1">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -688,6 +712,46 @@
         <div class="modal-actions">
           <button type="button" data-close="masterModal" class="secondary compact-btn">Cancel</button>
           <button type="submit" class="primary compact-btn">Update</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div id="unlockSetupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="unlockSetupTitle">
+    <form id="unlockSetupForm" class="modal-content">
+      <header class="modal-header">
+        <button type="button" data-close="unlockSetupModal" class="icon-btn" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+        <div class="modal-header-title">
+          <h3 id="unlockSetupTitle">Unlock Vault</h3>
+        </div>
+      </header>
+      <div class="modal-body">
+        <div class="card">
+          <div class="card-form-stack">
+            <p id="unlockSetupLead" class="modal-lead">Enter your master password to continue.</p>
+            <div class="field-group">
+              <label for="unlockSetupPassword">Master password</label>
+              <div class="input-wrapper has-toggle">
+                <input type="password" id="unlockSetupPassword" autocomplete="current-password" required />
+                <button type="button" class="icon-btn" data-toggle-password="unlockSetupPassword" aria-label="Show password" tabindex="-1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" data-close="unlockSetupModal" class="secondary compact-btn">Cancel</button>
+          <button type="submit" class="primary compact-btn">Unlock</button>
         </div>
       </div>
     </form>
