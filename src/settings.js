@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS = {
   vaultTimeout: 15,
   clipboardTimeout: 30,
   hibpCacheTtlHours: 24,
+  trustedDeviceMode: false,
   useSync: false
 };
 

@@ -5,6 +5,7 @@ import { validateEntry, validateImportData } from './validation.js';
 const VAULT_KEY    = 'securepassVault';
 const META_KEY     = 'securepassMeta';
 const BIOMETRIC_KEY = 'securepassBiometric';
+const TRUSTED_DEVICE_KEY = 'securepassTrustedDeviceKey';
 const ITERATIONS   = 600000;
 const CHUNK_SIZE   = 7000;
 const ENCODER = new TextEncoder();
@@ -600,10 +601,61 @@ export async function clearBiometricData() {
   await chrome.storage.local.remove(BIOMETRIC_KEY);
 }
 
-export async function saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable) {
+export async function saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable, mode = 'prf-unlock') {
   await chrome.storage.local.set({
-    [BIOMETRIC_KEY]: { enabled: true, credentialId, encryptedPassphrase, prfAvailable, createdAt: new Date().toISOString() }
+    [BIOMETRIC_KEY]: {
+      enabled: true,
+      credentialId,
+      encryptedPassphrase,
+      prfAvailable,
+      mode,
+      createdAt: new Date().toISOString(),
+    }
   });
+}
+
+async function getOrCreateTrustedDeviceKey() {
+  const existing = await chrome.storage.local.get(TRUSTED_DEVICE_KEY);
+  if (existing?.[TRUSTED_DEVICE_KEY]) {
+    return base64ToBuffer(existing[TRUSTED_DEVICE_KEY]);
+  }
+
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  await chrome.storage.local.set({ [TRUSTED_DEVICE_KEY]: bufferToBase64(raw.buffer) });
+  return raw.buffer;
+}
+
+async function importTrustedDeviceAesKey() {
+  const keyBytes = await getOrCreateTrustedDeviceKey();
+  return crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function clearTrustedDeviceKey() {
+  await chrome.storage.local.remove(TRUSTED_DEVICE_KEY);
+}
+
+export async function encryptPassphraseWithTrustedDevice(passphrase) {
+  const key = await importTrustedDeviceAesKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, ENCODER.encode(passphrase));
+  return { iv: bufferToBase64(iv.buffer), ciphertext: bufferToBase64(ct) };
+}
+
+export async function decryptPassphraseWithTrustedDevice(encryptedData) {
+  const key = await importTrustedDeviceAesKey();
+  const iv = new Uint8Array(base64ToBuffer(encryptedData.iv));
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    base64ToBuffer(encryptedData.ciphertext)
+  );
+  return DECODER.decode(decrypted);
 }
 
 // Derives an AES-256-GCM key from a WebAuthn PRF output via HKDF.

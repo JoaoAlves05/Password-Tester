@@ -21,6 +21,9 @@ import {
   saveBiometricSetup,
   encryptPassphraseWithPRF,
   decryptPassphraseWithPRF,
+  encryptPassphraseWithTrustedDevice,
+  decryptPassphraseWithTrustedDevice,
+  clearTrustedDeviceKey,
 } from '../src/cryptoVault.js';
 import { validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
 
@@ -28,8 +31,11 @@ function bufferToBase64(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)));
 }
 
-const pendingSaves = new Map();
+const VAULT_KEY = 'securepassVault';
+const CHUNK_SIZE = 7000;
 const BIOMETRIC_SESSION_PASSPHRASE_KEY = 'biometricSessionPassphrase';
+
+const pendingSaves = new Map();
 
 async function setBiometricSessionPassphrase(passphrase) {
   if (!passphrase) return;
@@ -43,6 +49,206 @@ async function getBiometricSessionPassphrase() {
 
 async function clearBiometricSessionPassphrase() {
   await chrome.storage.session.remove(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+}
+
+function recordsEqual(recordA, recordB) {
+  if (!recordA && !recordB) return true;
+  if (!recordA || !recordB) return false;
+  return JSON.stringify(recordA) === JSON.stringify(recordB);
+}
+
+async function getDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('SecurePassDB', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('vault')) {
+        db.createObjectStore('vault');
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readLocalVaultRecordRaw() {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('vault', 'readonly');
+      const store = tx.objectStore('vault');
+      const request = store.get(VAULT_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function writeLocalVaultRecordRaw(record) {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('vault', 'readwrite');
+    const store = tx.objectStore('vault');
+    const request = store.put(record, VAULT_KEY);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readSyncVaultRecordRaw() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(null, items => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      const manifest = items[`${VAULT_KEY}_manifest`];
+      if (!manifest || typeof manifest.chunks !== 'number' || manifest.chunks < 1) {
+        resolve(null);
+        return;
+      }
+
+      try {
+        let fullString = '';
+        for (let i = 0; i < manifest.chunks; i += 1) {
+          const chunk = items[`${VAULT_KEY}_chunk_${i}`];
+          if (chunk === undefined) {
+            resolve(null);
+            return;
+          }
+          fullString += chunk;
+        }
+        resolve(JSON.parse(fullString));
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function writeSyncVaultRecordRaw(record) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(`${VAULT_KEY}_manifest`, items => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      const oldManifest = items[`${VAULT_KEY}_manifest`];
+      const oldChunksCount = oldManifest ? oldManifest.chunks : 0;
+      const serialized = JSON.stringify(record);
+      const chunkCount = Math.ceil(serialized.length / CHUNK_SIZE);
+      const payload = {
+        [`${VAULT_KEY}_manifest`]: { chunks: chunkCount, updatedAt: Date.now() }
+      };
+
+      let chunkIdx = 0;
+      for (let i = 0; i < serialized.length; i += CHUNK_SIZE) {
+        payload[`${VAULT_KEY}_chunk_${chunkIdx}`] = serialized.substring(i, i + CHUNK_SIZE);
+        chunkIdx += 1;
+      }
+
+      const keysToRemove = [];
+      for (let i = chunkIdx; i < oldChunksCount; i += 1) {
+        keysToRemove.push(`${VAULT_KEY}_chunk_${i}`);
+      }
+
+      const persist = () => {
+        chrome.storage.sync.set(payload, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve();
+        });
+      };
+
+      if (keysToRemove.length) {
+        chrome.storage.sync.remove(keysToRemove, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          persist();
+        });
+      } else {
+        persist();
+      }
+    });
+  });
+}
+
+async function analyzeSyncTransition(targetUseSync) {
+  const localRecord = await readLocalVaultRecordRaw();
+  const syncRecord = await readSyncVaultRecordRaw();
+
+  const hasLocal = Boolean(localRecord);
+  const hasSync = Boolean(syncRecord);
+  const equalRecords = recordsEqual(localRecord, syncRecord);
+
+  let requiresResolution = false;
+  let defaultStrategy = null;
+
+  if (targetUseSync) {
+    if (hasLocal && !hasSync) {
+      defaultStrategy = 'copy-local-to-sync';
+    } else if (!hasLocal && hasSync) {
+      defaultStrategy = 'use-sync';
+    } else if (hasLocal && hasSync && !equalRecords) {
+      requiresResolution = true;
+    }
+  } else {
+    if (hasSync && !hasLocal) {
+      defaultStrategy = 'copy-sync-to-local';
+    } else if (!hasSync && hasLocal) {
+      defaultStrategy = 'use-local';
+    } else if (hasLocal && hasSync && !equalRecords) {
+      requiresResolution = true;
+    }
+  }
+
+  return {
+    targetUseSync,
+    hasLocal,
+    hasSync,
+    equalRecords,
+    requiresResolution,
+    defaultStrategy,
+  };
+}
+
+async function applySyncTransition(targetUseSync, strategy) {
+  const localRecord = await readLocalVaultRecordRaw();
+  const syncRecord = await readSyncVaultRecordRaw();
+  const hasLocal = Boolean(localRecord);
+  const hasSync = Boolean(syncRecord);
+
+  if (targetUseSync) {
+    if (strategy === 'keep-local') {
+      if (!hasLocal) throw new Error('No local vault data to keep.');
+      await writeSyncVaultRecordRaw(localRecord);
+    } else if (strategy === 'use-sync') {
+      if (!hasSync) throw new Error('No sync vault data available.');
+    } else if (strategy === 'copy-local-to-sync') {
+      if (!hasLocal) throw new Error('No local vault data to copy.');
+      await writeSyncVaultRecordRaw(localRecord);
+    }
+  } else {
+    if (strategy === 'use-sync') {
+      if (!hasSync) throw new Error('No sync vault data available.');
+      await writeLocalVaultRecordRaw(syncRecord);
+    } else if (strategy === 'keep-local') {
+      if (!hasLocal) throw new Error('No local vault data to keep.');
+    } else if (strategy === 'copy-sync-to-local') {
+      if (!hasSync) throw new Error('No sync vault data to copy.');
+      await writeLocalVaultRecordRaw(syncRecord);
+    }
+  }
+
+  const current = await loadSettings();
+  await saveSettings({ ...current, useSync: targetUseSync });
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -82,6 +288,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Assume settings module handles this safely or add validation
         await saveSettings(message.settings);
         sendResponse({ ok: true });
+        break;
+      }
+      case 'SET_SYNC_MODE_SAFE': {
+        try {
+          const targetUseSync = Boolean(message.targetUseSync);
+          const strategy = message.strategy || null;
+          const analysis = await analyzeSyncTransition(targetUseSync);
+
+          if (analysis.requiresResolution && !strategy) {
+            sendResponse({ ok: true, requiresResolution: true, analysis });
+            break;
+          }
+
+          const selectedStrategy = strategy || analysis.defaultStrategy || null;
+          await applySyncTransition(targetUseSync, selectedStrategy);
+          const settings = await loadSettings();
+          sendResponse({ ok: true, requiresResolution: false, applied: true, settings });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
         break;
       }
       case 'UNLOCK_VAULT': {
@@ -289,28 +515,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'BIOMETRIC_STATUS': {
         const enabled = await isBiometricEnabled();
         const data = await getBiometricData();
-        sendResponse({ ok: true, enabled, prfAvailable: data?.prfAvailable ?? false });
+        sendResponse({
+          ok: true,
+          enabled,
+          prfAvailable: data?.prfAvailable ?? false,
+          mode: data?.mode || (data?.prfAvailable ? 'prf-unlock' : 'verify-only'),
+        });
         break;
       }
       case 'DISABLE_BIOMETRIC': {
         await clearBiometricData();
         await clearBiometricSessionPassphrase();
+        await clearTrustedDeviceKey();
         sendResponse({ ok: true });
         break;
       }
       case 'BIOMETRIC_REGISTER_COMPLETE': {
         // Called by popup.js after successful credential creation
-        const { credentialId, prfOutput, prfAvailable, passphrase } = message;
+        const { credentialId, prfOutput, prfAvailable, passphrase, trustedDeviceRequested } = message;
         try {
+          const settings = await loadSettings();
+          const trustedRequested = Boolean(trustedDeviceRequested ?? settings?.trustedDeviceMode);
+          const hasPRF = Boolean(prfAvailable && prfOutput);
+          let mode = 'verify-only';
           let encryptedPassphrase = null;
-          if (prfAvailable && prfOutput && passphrase) {
+
+          if (hasPRF && passphrase) {
             encryptedPassphrase = await encryptPassphraseWithPRF(passphrase, prfOutput);
+            mode = 'prf-unlock';
+          } else if (trustedRequested && passphrase) {
+            encryptedPassphrase = await encryptPassphraseWithTrustedDevice(passphrase);
+            mode = 'trusted-device';
           }
-          if (passphrase) {
-            await setBiometricSessionPassphrase(passphrase);
-          }
-          await saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable);
-          sendResponse({ ok: true, prfAvailable });
+
+          await saveBiometricSetup(credentialId, encryptedPassphrase, hasPRF, mode);
+          sendResponse({ ok: true, prfAvailable: hasPRF, mode });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
         }
@@ -354,36 +593,65 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           let entry = null;
           let unlockError = null;
           try {
-            // 1. Try PRF-based unlock (biometric)
-            if (prfAvailable && prfOutput) {
-              const biometricData = await getBiometricData();
-              if (biometricData?.encryptedPassphrase) {
-                const pass = await decryptPassphraseWithPRF(biometricData.encryptedPassphrase, prfOutput);
-                await unlockVault(pass);
-                await setBiometricSessionPassphrase(pass);
+            const biometricData = await getBiometricData();
+            if (!biometricData) {
+              throw new Error('Biometric setup not found. Please configure biometric unlock again.');
+            }
+
+            const mode = biometricData.mode || (biometricData.prfAvailable ? 'prf-unlock' : 'verify-only');
+            if (mode !== 'prf-unlock') {
+              if (mode === 'trusted-device') {
+                if (!biometricData.encryptedPassphrase) {
+                  throw new Error('Trusted Device is enabled but not configured correctly. Reconfigure biometric unlock.');
+                }
+                const trustedPass = await decryptPassphraseWithTrustedDevice(biometricData.encryptedPassphrase);
+                await unlockVault(trustedPass);
+                const trustedStatus = await vaultStatus();
+                if (!trustedStatus.unlocked) {
+                  throw new Error('Trusted Device unlock failed. Please reconfigure biometric setup.');
+                }
+                const trustedEntries = await listCredentials();
+                entry = requestedCredentialId ? trustedEntries.find(e => e.id === requestedCredentialId) : null;
+              } else {
+                const sessionPass = await getBiometricSessionPassphrase();
+                if (!sessionPass) {
+                  throw new Error('Biometric verification completed. Enter your master password once to enable quick biometric unlock in this browser session.');
+                }
+
+                await unlockVault(sessionPass);
+                const verifyOnlyStatus = await vaultStatus();
+                if (!verifyOnlyStatus.unlocked) {
+                  throw new Error('Biometric verification succeeded but the vault is still locked. Enter your master password once and try again.');
+                }
+
+                const verifyOnlyEntries = await listCredentials();
+                entry = requestedCredentialId ? verifyOnlyEntries.find(e => e.id === requestedCredentialId) : null;
               }
-            }
-
-            // 2. Fallback for non-PRF authenticators: unlock using session passphrase
-            let status = await vaultStatus();
-            if (!status.unlocked) {
-              const sessionPassphrase = await getBiometricSessionPassphrase();
-              if (sessionPassphrase) {
-                await unlockVault(sessionPassphrase);
+            } else {
+              if (!prfAvailable || !prfOutput) {
+                throw new Error('This authenticator did not return PRF output. Reconfigure biometric unlock on a PRF-capable device.');
               }
-              status = await vaultStatus();
-            }
 
-            // 3. If still locked, prompt manual unlock once to seed session fallback
-            if (!status.unlocked) {
-              throw new Error('Biometric unlock needs one successful master-password unlock in this browser session.');
-            }
+              if (!biometricData.encryptedPassphrase) {
+                throw new Error('Biometric unlock is not configured correctly. Please set it up again.');
+              }
 
-            // 4. Retrieve requested credential
-            const entries = await listCredentials();
-            entry = requestedCredentialId ? entries.find(e => e.id === requestedCredentialId) : null;
+              const pass = await decryptPassphraseWithPRF(biometricData.encryptedPassphrase, prfOutput);
+              await unlockVault(pass);
+
+              const status = await vaultStatus();
+              if (!status.unlocked) {
+                throw new Error('Biometric authentication succeeded, but the vault could not be unlocked. Please set up biometric unlock again.');
+              }
+
+              // 2. Retrieve requested credential
+              const entries = await listCredentials();
+              entry = requestedCredentialId ? entries.find(e => e.id === requestedCredentialId) : null;
+            }
           } catch (e) {
-            unlockError = e.message;
+            if (e) {
+              unlockError = e.message;
+            }
           }
 
           // Clean up session

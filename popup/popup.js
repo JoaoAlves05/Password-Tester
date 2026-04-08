@@ -51,6 +51,7 @@ const themeRadios = document.querySelectorAll('input[name="appearanceTheme"]');
 const autoLockRange = document.getElementById('autoLockRange');
 const autoLockLabel = document.getElementById('autoLockLabel');
 const syncToggle = document.getElementById('syncToggle');
+const trustedDeviceToggle = document.getElementById('trustedDeviceToggle');
 const clipboardRange = document.getElementById('clipboardRange');
 const clipboardLabel = document.getElementById('clipboardLabel');
 const hibpCacheRange = document.getElementById('hibpCacheRange');
@@ -324,6 +325,9 @@ function syncSettingsView() {
   autoLockRange.value = timeout;
   autoLockLabel.textContent = `${timeout} min`;
   syncToggle.checked = Boolean(state.settings.useSync);
+  if (trustedDeviceToggle) {
+    trustedDeviceToggle.checked = Boolean(state.settings.trustedDeviceMode);
+  }
 
   const clipboardTimeout = state.settings.clipboardTimeout || 30;
   if (clipboardRange) clipboardRange.value = clipboardTimeout;
@@ -1205,7 +1209,6 @@ function attachEventListeners() {
   if (biometricUnlockBtn) {
     biometricUnlockBtn.addEventListener('click', async () => {
       biometricUnlockBtn.disabled = true;
-      const span = biometricUnlockBtn.querySelector('span');
 
       try {
         // 1. Get current biometric credential info from background
@@ -1254,6 +1257,27 @@ function attachEventListeners() {
         if (completeRes?.ok) {
           showToast('Vault unlocked!', 'success');
           await loadVaultStatus();
+        } else if (completeRes?.error?.includes('Enter your master password')) {
+          const passphrase = await promptForMasterPassword('Biometric verification succeeded. Enter your master password to unlock the vault.');
+          if (!passphrase) {
+            showToast('Master password is required to finish unlock.', 'warning');
+            return;
+          }
+
+          const timeoutMinutes = state.settings?.vaultTimeout || 15;
+          const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+          if (!unlockRes?.ok) {
+            throw new Error(unlockRes?.error || 'Unable to unlock vault.');
+          }
+
+          state.passphrase = passphrase;
+          state.vaultUnlocked = true;
+          state.vaultInitialized = true;
+          state.entries = unlockRes.data?.entries || [];
+          renderVaultState();
+          renderVaultEntries();
+          resetInactivityTimer();
+          showToast('Vault unlocked with biometric verification + master password.', 'success');
         } else {
           throw new Error(completeRes?.error || 'Authentication failed');
         }
@@ -1396,10 +1420,78 @@ function attachEventListeners() {
     scheduleSettingsSave();
   });
 
+  async function resolveSyncConflict(targetUseSync) {
+    if (targetUseSync) {
+      const choice = window.prompt(
+        'Conflict detected: Local and Sync vaults are different.\n\n' +
+        'Type 1 to keep Local (overwrite Sync).\n' +
+        'Type 2 to use Sync (keep Sync as source).\n' +
+        'Type 3 to cancel and merge manually via Export/Import.',
+        '3'
+      );
+
+      const normalized = (choice || '').trim();
+      if (normalized === '1') return 'keep-local';
+      if (normalized === '2') return 'use-sync';
+      return null;
+    }
+
+    const useSyncAsSource = window.confirm(
+      'Both Local and Chrome Sync vaults exist and they are different.\n\n' +
+      'Press OK to use Sync as source and overwrite Local.\n' +
+      'Press Cancel to keep Local and disable Sync without overwriting Local.'
+    );
+    return useSyncAsSource ? 'use-sync' : 'keep-local';
+  }
+
+  async function applySyncModeSafely(targetUseSync) {
+    let response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync });
+    if (!response?.ok) {
+      throw new Error(response?.error || 'Unable to change sync mode.');
+    }
+
+    if (response.requiresResolution) {
+      const strategy = await resolveSyncConflict(targetUseSync);
+      if (!strategy) {
+        throw new Error('Sync switch cancelled. You can merge manually via Export/Import first.');
+      }
+      response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync, strategy });
+      if (!response?.ok) {
+        throw new Error(response?.error || 'Unable to resolve sync conflict.');
+      }
+    }
+
+    return response;
+  }
+
   syncToggle.addEventListener('change', async () => {
     if (!state.settings) return;
-    state.settings.useSync = syncToggle.checked;
-    await saveSettings(state.settings);
+    const previous = Boolean(state.settings.useSync);
+    const targetUseSync = Boolean(syncToggle.checked);
+    if (targetUseSync === previous) return;
+
+    syncToggle.disabled = true;
+    try {
+      const res = await applySyncModeSafely(targetUseSync);
+      if (!res?.settings) {
+        throw new Error('Sync mode changed, but updated settings were not returned.');
+      }
+
+      state.settings = { ...state.settings, ...res.settings };
+      syncToggle.checked = Boolean(state.settings.useSync);
+      showToast(
+        state.settings.useSync
+          ? 'Chrome Sync enabled safely.'
+          : 'Local storage enabled safely.',
+        'success'
+      );
+    } catch (error) {
+      syncToggle.checked = previous;
+      state.settings.useSync = previous;
+      showToast(error.message || 'Unable to change sync mode.', 'error');
+    } finally {
+      syncToggle.disabled = false;
+    }
   });
 
   // New Settings Listeners
@@ -1478,13 +1570,13 @@ function attachEventListeners() {
   }
 
   async function performBiometricSetup() {
-    showToast('Confirma a tua identidade no sistema (Touch ID, PIN, etc.).', 'info');
+    showToast('Confirm your identity with Windows Hello / Touch ID / device PIN.', 'info');
     const rpId = chrome.runtime.id;
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const registerChallenge = crypto.getRandomValues(new Uint8Array(32));
 
     const credential = await navigator.credentials.create({
       publicKey: {
-        challenge,
+        challenge: registerChallenge,
         rp: { id: rpId, name: 'SecurePass' },
         user: {
           id: new TextEncoder().encode('securepass-user'),
@@ -1505,24 +1597,50 @@ function attachEventListeners() {
       },
     });
 
-    const prfResults = credential.getClientExtensionResults()?.prf?.results;
-    const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
+    // PRF output is only reliably available during assertion (get), not registration (create).
+    // Run a follow-up assertion immediately after registration to determine actual PRF availability.
+    const assertionChallenge = crypto.getRandomValues(new Uint8Array(32));
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: assertionChallenge,
+        rpId,
+        allowCredentials: [{
+          type: 'public-key',
+          id: credential.rawId,
+          transports: ['internal'],
+        }],
+        userVerification: 'required',
+        extensions: {
+          prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
+        },
+      },
+    });
+
+    const prfResults = assertion.getClientExtensionResults()?.prf?.results;
+    const prfOutput = prfResults?.first ? bufferToBase64(prfResults.first) : null;
 
     const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
       credentialId: bufferToBase64(credential.rawId),
       prfOutput,
       prfAvailable: !!prfOutput,
-      passphrase: state.passphrase
+      passphrase: state.passphrase,
+      trustedDeviceRequested: Boolean(state.settings?.trustedDeviceMode),
     });
 
     if (res?.ok) {
       collapseBiometricInlineAuth(true);
-      showToast('Biometria configurada com sucesso!', 'success');
+      if (res.mode === 'prf-unlock') {
+        showToast('Biometric unlock enabled with PRF (passwordless).', 'success');
+      } else if (res.mode === 'trusted-device') {
+        showToast('Trusted Device enabled: biometric-only unlock on this device.', 'warning');
+      } else {
+        showToast('Biometric verification enabled. Master password is still required to unlock.', 'info');
+      }
       await refreshBiometricBtn();
       return;
     }
 
-    throw new Error(res?.error || 'Erro ao configurar biometria.');
+    throw new Error(res?.error || 'Failed to configure biometric unlock.');
   }
 
   async function refreshBiometricBtn() {
@@ -1544,15 +1662,50 @@ function attachEventListeners() {
 
     if (res?.enabled) {
       biometricBtnLabel.textContent = 'Disable Biometric Unlock';
-      biometricBtnSub.textContent   = res.prfAvailable
-        ? 'Active · PRF encryption enabled'
-        : 'Active · Session-based (re-enter password after restart)';
+      biometricBtnSub.textContent = res.mode === 'prf-unlock'
+        ? 'Active · PRF-backed unlock enabled'
+        : res.mode === 'trusted-device'
+          ? 'Active · Trusted Device mode (higher local risk)'
+          : 'Active · Verify-only mode (master password once per session)';
       biometricSetupBtn.classList.add('danger');
     } else {
       biometricBtnLabel.textContent = 'Set up Biometric Unlock';
-      biometricBtnSub.textContent   = 'Use fingerprint, Face ID or device PIN';
+      biometricBtnSub.textContent = state.settings?.trustedDeviceMode
+        ? 'Will use Trusted Device fallback when PRF is unavailable'
+        : 'Use fingerprint, Face ID or device PIN';
       biometricSetupBtn.classList.remove('danger');
     }
+  }
+
+  if (trustedDeviceToggle) {
+    trustedDeviceToggle.addEventListener('change', async () => {
+      if (!state.settings) return;
+      const next = Boolean(trustedDeviceToggle.checked);
+
+      if (next) {
+        const confirmed = window.confirm(
+          'Trusted Device Mode stores a local unlock secret so biometric unlock works after restart on non-PRF devices.\n\n' +
+          'Security warning: this is less secure than PRF mode.\n\n' +
+          'Enable Trusted Device Mode?'
+        );
+        if (!confirmed) {
+          trustedDeviceToggle.checked = false;
+          return;
+        }
+      }
+
+      state.settings.trustedDeviceMode = next;
+      await saveSettings(state.settings);
+
+      const bio = await sendMessage('BIOMETRIC_STATUS');
+      if (bio?.enabled) {
+        showToast('Trusted Device preference saved. Re-run biometric setup to apply mode change.', 'info');
+      } else {
+        showToast(next ? 'Trusted Device mode enabled.' : 'Trusted Device mode disabled.', 'success');
+      }
+
+      await refreshBiometricBtn();
+    });
   }
 
   if (biometricSetupBtn) {
@@ -1578,9 +1731,9 @@ function attachEventListeners() {
           await performBiometricSetup();
         } catch (err) {
           if (err.name === 'NotAllowedError') {
-            showToast('Configuração biométrica cancelada.', 'info');
+            showToast('Biometric setup cancelled.', 'info');
           } else {
-            showToast('Erro: ' + err.message, 'error');
+            showToast('Error: ' + err.message, 'error');
           }
         }
       }
@@ -1636,9 +1789,9 @@ function attachEventListeners() {
         await performBiometricSetup();
       } catch (err) {
         if (err.name === 'NotAllowedError') {
-          showToast('Configuração biométrica cancelada.', 'info');
+          showToast('Biometric setup cancelled.', 'info');
         } else {
-          showToast('Erro: ' + err.message, 'error');
+          showToast('Error: ' + err.message, 'error');
         }
       }
     });
@@ -1667,6 +1820,7 @@ function attachEventListeners() {
         avoidSimilar: true,
         vaultTimeout: 15,
         hibpCacheTtlHours: 24,
+        trustedDeviceMode: false,
         useSync: false,
         clipboardTimeout: 30,
         generatorDefaults: {
