@@ -10,6 +10,17 @@ export const MAX_LENGTHS = {
   id: 64
 };
 
+export const BACKUP_VERSION = 1;
+
+export function createVaultBackup(entries) {
+  return {
+    kind: 'securepass-vault-backup',
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    entries: Array.isArray(entries) ? entries : []
+  };
+}
+
 function sanitizeString(str) {
   if (typeof str !== 'string') return '';
   // Remove control characters (except common whitespace), keep printable characters
@@ -94,6 +105,9 @@ export function validateImportData(data) {
   }
 
   let entries = data.entries;
+  if (!entries && data.vault && Array.isArray(data.vault.entries)) {
+    entries = data.vault.entries;
+  }
   if (!entries && Array.isArray(data)) {
     entries = data;
   }
@@ -118,5 +132,8 @@ export function validateImportData(data) {
     }
   }
 
-  return { entries: cleanEntries };
+  const version = typeof data.version === 'number' ? data.version : null;
+  const exportedAt = typeof data.exportedAt === 'string' ? data.exportedAt : null;
+
+  return { entries: cleanEntries, version, exportedAt };
 }

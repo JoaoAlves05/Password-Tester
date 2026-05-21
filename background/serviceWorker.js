@@ -1,6 +1,7 @@
 import { checkPassword } from '../src/hibp.js';
 import { generatePassword } from '../src/passwordGenerator.js';
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from '../src/settings.js';
+import { decryptBackupPayload, encryptBackupPayload, isEncryptedBackupEnvelope } from '../src/backupCrypto.js';
 import {
   initializeVault,
   unlockVault,
@@ -24,14 +25,17 @@ import {
   encryptPassphraseWithTrustedDevice,
   decryptPassphraseWithTrustedDevice,
   clearTrustedDeviceKey,
+  overwriteVaultEntries,
 } from '../src/cryptoVault.js';
-import { validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
+import { createVaultBackup, validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
 
 function bufferToBase64(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)));
 }
 
 const VAULT_KEY = 'securepassVault';
+const META_KEY = 'securepassMeta';
+const SECUREPASS_DB_NAME = 'SecurePassDB';
 const CHUNK_SIZE = 7000;
 const BIOMETRIC_SESSION_PASSPHRASE_KEY = 'biometricSessionPassphrase';
 
@@ -49,6 +53,50 @@ async function getBiometricSessionPassphrase() {
 
 async function clearBiometricSessionPassphrase() {
   await chrome.storage.session.remove(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+}
+
+function isExtensionPageSender(sender) {
+  return Boolean(sender && sender.id === chrome.runtime.id && !sender.tab);
+}
+
+async function deleteIndexedDb(name) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error || new Error(`Failed to delete ${name}`));
+    request.onblocked = () => reject(new Error(`Unable to delete ${name} because it is still open.`));
+  });
+}
+
+async function clearClipboardAlarmState() {
+  try {
+    await chrome.alarms.clear('clearClipboard');
+  } catch {}
+}
+
+async function clearVaultAutoLockAlarmState() {
+  try {
+    await chrome.alarms.clear('vaultAutoLock');
+  } catch {}
+}
+
+async function clearAllUserData() {
+  pendingSaves.clear();
+  await clearBiometricSessionPassphrase();
+  await clearTrustedDeviceKey();
+  await Promise.allSettled([
+    chrome.storage.local.clear(),
+    chrome.storage.sync.clear(),
+    chrome.storage.session.clear(),
+    clearClipboardAlarmState(),
+    clearVaultAutoLockAlarmState(),
+    deleteIndexedDb(SECUREPASS_DB_NAME),
+  ]);
+}
+
+async function clearVaultEntriesOnly() {
+  await overwriteVaultEntries([]);
+  await chrome.storage.local.remove(META_KEY);
 }
 
 function recordsEqual(recordA, recordB) {
@@ -76,6 +124,11 @@ async function readLocalVaultRecordRaw() {
     const db = await getDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction('vault', 'readonly');
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
       const store = tx.objectStore('vault');
       const request = store.get(VAULT_KEY);
       request.onsuccess = () => resolve(request.result || null);
@@ -90,6 +143,11 @@ async function writeLocalVaultRecordRaw(record) {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('vault', 'readwrite');
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
     const store = tx.objectStore('vault');
     const request = store.put(record, VAULT_KEY);
     request.onsuccess = () => resolve();
@@ -258,6 +316,27 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const handler = async () => {
+    const extensionOnlyMessages = new Set([
+      'SET_SYNC_MODE_SAFE',
+      'SAVE_SETTINGS',
+      'STORE_CREDENTIAL',
+      'UPDATE_CREDENTIAL',
+      'DELETE_CREDENTIAL',
+      'INITIALIZE_VAULT',
+      'CHANGE_MASTER_PASSWORD',
+      'EXPORT_VAULT',
+      'IMPORT_VAULT',
+      'CLEAR_VAULT_ENTRIES',
+      'WIPE_ALL_DATA',
+      'DISABLE_BIOMETRIC',
+      'BIOMETRIC_REGISTER_COMPLETE',
+    ]);
+
+    if (extensionOnlyMessages.has(message.type) && !isExtensionPageSender(sender)) {
+      sendResponse({ ok: false, error: 'Forbidden' });
+      return;
+    }
+
     switch (message.type) {
       case 'HIBP_CHECK': {
         try {
@@ -467,8 +546,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ ok: false, error: 'Vault is locked' });
             return;
           }
+
           const entries = await listCredentials();
-          sendResponse({ ok: true, data: { entries } });
+          const backup = createVaultBackup(entries);
+          const format = message?.format === 'plaintext' ? 'plaintext' : 'encrypted';
+
+          if (format === 'plaintext') {
+            sendResponse({ ok: true, data: backup, encrypted: false });
+            return;
+          }
+
+          const backupPassword = validateString(message.backupPassword, 1024, 'backupPassword', true);
+          const encryptedBackup = await encryptBackupPayload(backup, backupPassword);
+          sendResponse({ ok: true, data: encryptedBackup, encrypted: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
         }
@@ -481,12 +571,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ ok: false, error: 'Vault is locked' });
             return;
           }
+
+          const passphrase = message.passphrase ? validateString(message.passphrase, 1024, 'passphrase', true) : '';
+
+          let importSource = message.data;
+          if (isEncryptedBackupEnvelope(importSource)) {
+            const backupPassword = validateString(message.backupPassword, 1024, 'backupPassword', true);
+            importSource = await decryptBackupPayload(importSource, backupPassword);
+          }
+
+          const cleanData = validateImportData(importSource);
           
-          const passphrase = validateString(message.passphrase, 1024, 'passphrase', true);
-          const cleanData = validateImportData(message.data);
-          
-          const count = await importVaultData(cleanData, passphrase);
+          const count = await importVaultData(cleanData, passphrase || undefined);
           sendResponse({ ok: true, count });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'CLEAR_VAULT_ENTRIES': {
+        try {
+          const status = await vaultStatus();
+          if (!status.unlocked) {
+            sendResponse({ ok: false, error: 'Vault is locked' });
+            return;
+          }
+
+          await clearVaultEntriesOnly();
+          sendResponse({ ok: true });
+        } catch (error) {
+          sendResponse({ ok: false, error: error.message });
+        }
+        break;
+      }
+      case 'WIPE_ALL_DATA': {
+        try {
+          await lockVault();
+          await clearAllUserData();
+          sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
         }

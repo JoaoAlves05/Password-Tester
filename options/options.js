@@ -36,6 +36,7 @@ const vaultStatusText = vaultStatusEl?.querySelector('.status-text');
 // State
 let currentModalResolve = null;
 let vaultStatusInterval = null;
+let currentSettings = { ...DEFAULT_SETTINGS };
 
 function systemPrefersDark() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -94,13 +95,14 @@ function populateForm(settings) {
 
 // --- Modal Logic ---
 
-function showModal({ title, message, showInput = false, confirmText = 'Confirm', cancelText = 'Cancel', isDanger = false }) {
+function showModal({ title, message, showInput = false, inputType = 'password', confirmText = 'Confirm', cancelText = 'Cancel', isDanger = false }) {
   return new Promise((resolve) => {
     modalTitle.textContent = title;
     modalMessage.textContent = message;
     
     if (showInput) {
       modalInputContainer.classList.remove('hidden');
+      modalInput.type = inputType;
       modalInput.value = '';
       modalInputError.classList.add('hidden');
       setTimeout(() => modalInput.focus(), 100);
@@ -163,6 +165,7 @@ function setupModalListeners() {
 
 async function init() {
   const settings = await loadSettings();
+  currentSettings = { ...settings };
   populateForm(settings);
   setupModalListeners();
 
@@ -194,11 +197,56 @@ async function init() {
       
       if (hasSettingsChange) {
         loadSettings().then(settings => {
+          currentSettings = { ...settings };
           populateForm(settings);
         });
       }
     }
   });
+}
+
+async function resolveSyncConflict(targetUseSync) {
+  if (targetUseSync) {
+    const choice = window.prompt(
+      'Conflict detected: Local and Sync vaults are different.\n\n' +
+      'Type 1 to keep Local (overwrite Sync).\n' +
+      'Type 2 to use Sync (keep Sync as source).\n' +
+      'Type 3 to cancel and merge manually via Export/Import.',
+      '3'
+    );
+
+    const normalized = (choice || '').trim();
+    if (normalized === '1') return 'keep-local';
+    if (normalized === '2') return 'use-sync';
+    return null;
+  }
+
+  const useSyncAsSource = window.confirm(
+    'Both Local and Chrome Sync vaults exist and they are different.\n\n' +
+    'Press OK to use Sync as source and overwrite Local.\n' +
+    'Press Cancel to keep Local and disable Sync without overwriting Local.'
+  );
+  return useSyncAsSource ? 'use-sync' : 'keep-local';
+}
+
+async function applySyncModeSafely(targetUseSync) {
+  let response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync });
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Unable to change sync mode.');
+  }
+
+  if (response.requiresResolution) {
+    const strategy = await resolveSyncConflict(targetUseSync);
+    if (!strategy) {
+      throw new Error('Sync switch cancelled. You can merge manually via Export/Import first.');
+    }
+    response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync, strategy });
+    if (!response?.ok) {
+      throw new Error(response?.error || 'Unable to resolve sync conflict.');
+    }
+  }
+
+  return response;
 }
 
 form.addEventListener('submit', async event => {
@@ -224,10 +272,28 @@ form.addEventListener('submit', async event => {
     }
   });
 
-  await saveSettings(settings);
-  applyTheme(settings.theme);
+  try {
+    const previousUseSync = Boolean(currentSettings.useSync);
+    const targetUseSync = Boolean(settings.useSync);
 
-  showStatus('Settings saved successfully!');
+    if (targetUseSync !== previousUseSync) {
+      const syncResult = await applySyncModeSafely(targetUseSync);
+      if (!syncResult?.ok) {
+        throw new Error(syncResult?.error || 'Unable to apply sync mode safely.');
+      }
+      settings.useSync = targetUseSync;
+    }
+
+    await saveSettings(settings);
+    currentSettings = { ...settings };
+    applyTheme(settings.theme);
+    showStatus('Settings saved successfully!');
+  } catch (error) {
+    const reloaded = await loadSettings();
+    currentSettings = { ...reloaded };
+    populateForm(reloaded);
+    showStatus(error.message || 'Unable to save settings.', 'error');
+  }
 });
 
 function showStatus(msg, type = 'success') {
@@ -299,52 +365,52 @@ async function handleResetSettings() {
 
   if (!confirmed) return;
 
-  await saveSettings(DEFAULT_SETTINGS);
-  populateForm(DEFAULT_SETTINGS);
-  showStatus('Settings reset to defaults.');
+  try {
+    const previousUseSync = Boolean(currentSettings.useSync);
+    const targetUseSync = Boolean(DEFAULT_SETTINGS.useSync);
+    if (targetUseSync !== previousUseSync) {
+      await applySyncModeSafely(targetUseSync);
+    }
+
+    await saveSettings(DEFAULT_SETTINGS);
+    currentSettings = { ...DEFAULT_SETTINGS };
+    populateForm(DEFAULT_SETTINGS);
+    showStatus('Settings reset to defaults.');
+  } catch (error) {
+    showStatus(error.message || 'Unable to reset settings.', 'error');
+  }
 }
 
 async function handleClearData() {
   const { confirmed } = await showModal({
     title: 'Clear All Data',
-    message: 'DANGER: This will permanently delete ALL your vault data and reset all settings. This action is irreversible.',
+    message: 'DANGER: This will permanently delete ALL vault data, settings, biometric setup, and local storage. Type WIPE ALL DATA to continue.',
     confirmText: 'Delete Everything',
     isDanger: true
   });
 
   if (!confirmed) return;
 
-  // Double confirmation with password
-  const { confirmed: passConfirmed, value: password } = await showModal({
+  const { confirmed: phraseConfirmed, value: phrase } = await showModal({
     title: 'Confirm Deletion',
-    message: 'Please enter your master password to confirm deletion.',
+    message: 'Type WIPE ALL DATA exactly as shown to permanently delete everything stored by SecurePass.',
     showInput: true,
-    confirmText: 'Confirm Deletion',
+    inputType: 'text',
+    confirmText: 'Wipe Everything',
     isDanger: true
   });
 
-  if (!passConfirmed || !password) return;
-
-  // VERIFY PASSWORD by attempting to unlock
-  // If the vault is already unlocked, we still want to verify the user knows the password (re-auth)
-  // But UNLOCK_VAULT works even if already unlocked (it just returns success)
-  // However, we should make sure the password is correct.
-  // If the password is wrong, UNLOCK_VAULT returns error.
-  
-  const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase: password });
-  if (!unlockRes.ok) {
-    showStatus('Incorrect password. Data NOT cleared.', 'error');
+  if (!phraseConfirmed || (phrase || '').trim() !== 'WIPE ALL DATA') {
+    showStatus('Deletion cancelled.', 'warning');
     return;
   }
 
-  // Password verified, proceed with deletion
-  
-  // Clear local storage (vault + settings)
-  await chrome.storage.local.clear();
-  // Clear sync storage (synced settings)
-  await chrome.storage.sync.clear();
+  const response = await sendMessage('WIPE_ALL_DATA');
+  if (!response?.ok) {
+    showStatus(response?.error || 'Unable to clear data.', 'error');
+    return;
+  }
 
-  // Reload defaults
   populateForm(DEFAULT_SETTINGS);
   showStatus('All data cleared successfully.');
   
@@ -382,7 +448,23 @@ async function ensureVaultUnlocked() {
 async function handleExportVault() {
   if (!(await ensureVaultUnlocked())) return;
 
-  const response = await sendMessage('EXPORT_VAULT');
+  const { confirmed, value: backupPassword } = await showModal({
+    title: 'Encrypt Backup',
+    message: 'Set a backup password. You will need this password to import the backup later.',
+    showInput: true,
+    inputType: 'password',
+    confirmText: 'Export Encrypted'
+  });
+
+  if (!confirmed || !(backupPassword || '').trim()) {
+    showStatus('Backup export cancelled.', 'warning');
+    return;
+  }
+
+  const response = await sendMessage('EXPORT_VAULT', {
+    format: 'encrypted',
+    backupPassword: backupPassword.trim()
+  });
   if (!response?.ok) {
     showStatus(response?.error || 'Export failed.', 'error');
     return;
@@ -392,7 +474,7 @@ async function handleExportVault() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `securepass-vault-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `securepass-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -413,29 +495,32 @@ async function handleImportFile(event) {
   reader.onload = async (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      
-      // We need the password to re-encrypt the data into the vault
-      const { confirmed, value: password } = await showModal({
-        title: 'Import Vault',
-        message: 'Enter your master password to encrypt and import the data.',
-        showInput: true,
-        confirmText: 'Import'
-      });
 
-      if (!confirmed || !password) {
+      if (!(await ensureVaultUnlocked())) {
         importVaultFile.value = '';
         return;
       }
 
-      // Ensure unlocked first (needed for some internal checks in SW)
-      const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase: password });
-      if (!unlockRes.ok) {
-        showStatus('Incorrect password. Import cancelled.', 'error');
-        importVaultFile.value = '';
-        return;
+      let backupPassword = '';
+      if (data?.kind === 'securepass-encrypted-backup') {
+        const prompt = await showModal({
+          title: 'Encrypted Backup',
+          message: 'Enter the backup password used when this file was exported.',
+          showInput: true,
+          inputType: 'password',
+          confirmText: 'Import Backup'
+        });
+
+        if (!prompt.confirmed || !(prompt.value || '').trim()) {
+          importVaultFile.value = '';
+          showStatus('Import cancelled.', 'warning');
+          return;
+        }
+
+        backupPassword = prompt.value.trim();
       }
 
-      const response = await sendMessage('IMPORT_VAULT', { data, passphrase: password });
+      const response = await sendMessage('IMPORT_VAULT', { data, backupPassword });
 
       if (!response?.ok) {
         showStatus(response?.error || 'Import failed.', 'error');

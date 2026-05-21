@@ -124,6 +124,11 @@ async function loadVaultRecord() {
       const db = await getDB();
       return new Promise((resolve, reject) => {
         const tx = db.transaction('vault', 'readonly');
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error);
+        };
         const store = tx.objectStore('vault');
         const request = store.get(VAULT_KEY);
         request.onsuccess = () => resolve(request.result || null);
@@ -182,6 +187,11 @@ async function saveVaultRecord(record) {
     const db = await getDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction('vault', 'readwrite');
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
       const store = tx.objectStore('vault');
       const request = store.put(record, VAULT_KEY);
       request.onsuccess = () => resolve();
@@ -279,6 +289,24 @@ async function writeVault(data, passphrase) {
   const record = await encryptData(data, pass);
   await saveVaultRecord(record);
   cache.data = data;
+}
+
+export async function overwriteVaultEntries(entries, passphrase) {
+  const pass = passphrase || unlockedPassphrase;
+  if (!pass) throw new Error('Passphrase required to rewrite vault');
+
+  const data = { entries: Array.isArray(entries) ? entries : [] };
+  await writeVault(data, pass);
+  const settings = await loadSettings();
+  const timeout = settings.vaultTimeout || 15;
+
+  try {
+    await updateActivity(timeout);
+  } catch (e) {
+    // Ignore session storage errors
+  }
+
+  return data;
 }
 
 // --- Public API ---

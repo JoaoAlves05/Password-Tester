@@ -34,7 +34,7 @@
 
 ## Overview
 
-SecurePass is a **Manifest V3** browser extension that gives users full control over their credentials without ever sending sensitive data to a third-party server. Every cryptographic operation — key derivation, encryption, and decryption — runs entirely inside the browser using the native **Web Crypto API**.
+SecurePass is a **Manifest V3** browser extension that gives users full control over their credentials without ever sending sensitive data to a third-party server. Every cryptographic operation - key derivation, encryption, and decryption - runs entirely inside the browser using the native **Web Crypto API**.
 
 The extension ships three integrated tools accessible from the popup:
 
@@ -42,7 +42,7 @@ The extension ships three integrated tools accessible from the popup:
 |---|---|
 | **Tester** *(default)* | Real-time password strength analysis with entropy scoring, crack-time estimation, HIBP breach check, and a "Save to vault" shortcut |
 | **Generator** | Generates cryptographically secure passwords — configurable length, character sets, and "avoid similar characters" toggle, with a "Save to vault" shortcut |
-| **Vault** | Locked/unlocked credential store with search, add, edit, and delete — protected by a master password and optional biometric unlock |
+| **Vault** | Locked/unlocked credential store with search, add, edit, and delete - protected by a master password, PRF-backed biometric unlock, or optional Trusted Device mode |
 
 A persistent **content script** enriches every web page with an inline assistant: it detects password fields, surfaces saved credentials for autofill, offers one-click generation, and prompts to save new credentials after form submission.
 
@@ -55,9 +55,16 @@ A persistent **content script** enriches every web page with an inline assistant
 - The vault is protected by a **master password** — never stored in plaintext, never sent over the network.
 - A **metadata layer** (`id`, `username`, `site`) is stored separately, allowing the extension to show credential stubs even when the vault is locked.
 
+### 🛡️ Biometric Unlock Modes
+- **PRF-backed unlock** is the preferred path. When the authenticator exposes WebAuthn PRF output, the vault unlocks without asking for the master password.
+- **Verify-only fallback** uses Windows Hello / Touch ID / device PIN to verify identity, then seeds the browser session once with the master password on non-PRF devices.
+- **Trusted Device mode** is optional and disabled by default. It stores a local unlock secret on the device so biometric unlock can continue after browser restarts on non-PRF hardware.
+- The setup flow detects PRF capability during a real assertion, not just during credential creation, so the saved mode matches actual device behavior.
+
 ### 🛡️ Biometric Unlock (WebAuthn + PRF)
 - Supports **passkey-based vault unlock** via the [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension).
 - The master password is encrypted with an AES-256-GCM key derived from the biometric PRF output via **HKDF-SHA-256**, stored only as ciphertext.
+- On devices without PRF, SecurePass can fall back to verify-only or Trusted Device mode depending on the user's explicit preference.
 - Registration and management of biometric unlock live in the popup's **Settings panel → Security** section. Once enabled, a **Biometric Unlock** button appears on the vault unlock screen alongside the master password field.
 
 ### ⚡ Intelligent Inline Assistant
@@ -78,6 +85,11 @@ A persistent **content script** enriches every web page with an inline assistant
 - **5 failed unlock attempts** trigger a 30-second lockout to prevent brute-force attacks.
 - The vault also auto-locks when the OS reports an idle or locked state.
 
+### ☁️ Safe Chrome Sync
+- Chrome Sync is gated behind a **safe activation flow**.
+- If local and sync vault records both exist and differ, SecurePass stops and asks for an explicit choice instead of overwriting silently.
+- You can keep Local, use Sync, or cancel and merge manually through export/import.
+
 ### ⚙️ Two Settings Surfaces
 
 **Popup Settings panel** (gear icon ⚙ in the popup header):
@@ -86,6 +98,7 @@ A persistent **content script** enriches every web page with an inline assistant
 - Clipboard auto-clear timeout slider
 - Change Master Key
 - Set up / Disable Biometric Unlock *(Security section)*
+- Trusted Device mode toggle *(optional, off by default, with risk warning)*
 - Chrome Sync toggle
 - Export Vault (JSON), Import Vault (JSON), Clear Vault
 
@@ -93,7 +106,7 @@ A persistent **content script** enriches every web page with an inline assistant
 - Appearance (theme)
 - Security (vault timeout, clipboard timeout, HIBP cache TTL sliders)
 - Generator Defaults (default length, character sets)
-- Sync (Chrome Sync toggle)
+- Sync (Chrome Sync toggle with safe conflict resolution)
 - Data Management (Reset Settings, Export Vault, Import Vault, Clear All Data)
 
 ---
@@ -126,6 +139,11 @@ A persistent **content script** enriches every web page with an inline assistant
                                                          │
                                                          ▼
                                                    unlock vault
+
+   Non-PRF Paths:
+   ───────────────
+   WebAuthn verification ──► session seed (default fallback)
+                                       └─► trusted-device local secret (opt-in)
 ```
 
 | Property | Value |
@@ -135,6 +153,7 @@ A persistent **content script** enriches every web page with an inline assistant
 | IV | 96-bit random per encryption |
 | Salt | 128-bit random per vault init |
 | Biometric key | HKDF-SHA256 from WebAuthn PRF output |
+| Trusted Device key | Local device-only AES-256-GCM wrapping key |
 | HIBP privacy | k-Anonymity (5-char SHA-1 prefix only) |
 | Plaintext stored | **Never** |
 
@@ -194,8 +213,11 @@ The cryptographic backbone of the extension.
 | `listCredentialsMeta` | `() → stub[]` | Returns credential stubs (no passwords) |
 | `changeMasterPassword` | `(old, new) → void` | Re-encrypts vault with a new password |
 | `importVaultData` | `(data, passphrase) → count` | Merges entries from a JSON export |
-| `saveBiometricSetup` | `(credId, encPass, prfAvailable) → void` | Persists biometric registration data |
+| `saveBiometricSetup` | `(credId, encPass, prfAvailable, mode?) → void` | Persists biometric registration data and unlock mode |
 | `decryptPassphraseWithPRF` | `(encData, prfB64) → passphrase` | Recovers master password via WebAuthn PRF output |
+| `encryptPassphraseWithTrustedDevice` | `(passphrase) → wrappedPassphrase` | Stores a device-local secret for Trusted Device mode |
+| `decryptPassphraseWithTrustedDevice` | `(wrappedPassphrase) → passphrase` | Restores the passphrase from the device-local secret |
+| `clearTrustedDeviceKey` | `() → void` | Removes the device-local secret |
 
 ### `src/passwordGenerator.js`
 
@@ -315,6 +337,8 @@ A **gear icon ⚙** in the top-right corner opens the in-popup **Settings panel*
 **Unlock an existing vault:**
 1. Enter your master password and click **Unlock vault**, or
 2. If biometric unlock is configured, click **Biometric Unlock** (the button appears automatically on the unlock screen when biometrics are enabled).
+3. If your device supports PRF, SecurePass unlocks the vault directly after Windows Hello / Touch ID.
+4. If PRF is unavailable, SecurePass falls back to verify-only mode or Trusted Device mode depending on your settings.
 
 **When unlocked**, the vault shows your credential list with:
 - **Search** — filter credentials by username or site.
@@ -337,11 +361,15 @@ Click the **gear icon ⚙** in the popup to open the Settings panel. It contains
 - **Change Master Key** — enter current and new password
 - **Set up Biometric Unlock** / **Disable Biometric Unlock**
   - Registers a WebAuthn passkey on your device (fingerprint, Face ID, or PIN)
+   - PRF-backed devices unlock without the master password
+   - Non-PRF devices can use verify-only fallback or Trusted Device mode
   - Once enabled, the "Biometric Unlock" button appears on the vault lock screen
   - Only available when the vault is unlocked
+ - **Trusted Device mode** — stores a device-local secret so biometric unlock survives browser restarts on non-PRF devices
 
 **Sync**
 - Chrome Sync toggle — stores the encrypted vault in `chrome.storage.sync` for cross-device access
+- If local and sync copies diverge, SecurePass prompts before switching instead of overwriting silently
 
 **Data Management**
 - **Reset Settings** — restore generator and security defaults
@@ -394,6 +422,18 @@ git checkout -b feature/my-feature
 # Push and open a PR
 git push origin feature/my-feature
 ```
+
+---
+
+## Biometric Compatibility Notes
+
+SecurePass uses a tiered biometric strategy:
+
+1. **PRF available**: true passwordless biometric unlock.
+2. **PRF unavailable**: verify identity with Windows Hello / Touch ID, then use a one-time session seed.
+3. **Trusted Device enabled**: optional persistent device-local unlock for users who want biometrics-only convenience on hardware without PRF.
+
+The popup now reflects the actual configured mode, so you can tell whether a device is running PRF-backed unlock, verify-only, or Trusted Device mode.
 
 ---
 

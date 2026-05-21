@@ -819,6 +819,38 @@ async function ensureVaultUnlockedWithPassphrase(promptLabel = 'Enter your maste
   return true;
 }
 
+async function ensureVaultAccessible(promptLabel = 'Enter your master password to continue.') {
+  const statusRes = await sendMessage('VAULT_STATUS');
+  if (statusRes?.ok && statusRes.status?.unlocked) {
+    state.vaultUnlocked = true;
+    resetInactivityTimer();
+    return true;
+  }
+
+  const typed = await promptForMasterPassword(promptLabel);
+  const passphrase = (typed || '').trim();
+  if (!passphrase) {
+    showToast('Master password is required.', 'warning');
+    return false;
+  }
+
+  const timeoutMinutes = state.settings?.vaultTimeout || 15;
+  const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+  if (!response?.ok) {
+    showToast(response?.error || 'Unable to unlock vault.', 'error');
+    return false;
+  }
+
+  state.passphrase = passphrase;
+  state.vaultUnlocked = true;
+  state.vaultInitialized = true;
+  state.entries = response.data?.entries || [];
+  renderVaultState();
+  renderVaultEntries();
+  resetInactivityTimer();
+  return true;
+}
+
 async function lockVault(showMessage = false) {
   await sendMessage('LOCK_VAULT');
   state.vaultUnlocked = false;
@@ -1832,38 +1864,58 @@ function attachEventListeners() {
         }
       };
 
-      state.settings = defaults;
-      await saveSettings(state.settings);
-      applyTheme(state.settings.theme);
-      syncSettingsView();
-      showToast('Settings reset to defaults.', 'success');
+      try {
+        const previous = Boolean(state.settings?.useSync);
+        const targetUseSync = Boolean(defaults.useSync);
+        if (targetUseSync !== previous) {
+          await applySyncModeSafely(targetUseSync);
+        }
+
+        state.settings = defaults;
+        await saveSettings(state.settings);
+        applyTheme(state.settings.theme);
+        syncSettingsView();
+        showToast('Settings reset to defaults.', 'success');
+      } catch (error) {
+        showToast(error.message || 'Unable to reset settings safely.', 'error');
+      }
     });
   }
 
   if (exportVaultBtn) {
     exportVaultBtn.addEventListener('click', async () => {
-      if (!requireUnlockedVault()) return;
-      const response = await sendMessage('LIST_CREDENTIALS');
-      if (response?.entries) {
-        const blob = new Blob([JSON.stringify(response.entries, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `password-tester-vault-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Vault exported successfully.', 'success');
-      } else {
-        showToast('Failed to export vault.', 'error');
+      if (!(await ensureVaultAccessible('Unlock the vault to export your backup.'))) return;
+      const backupPassword = await promptForMasterPassword('Set a backup password. You will need it to import this backup later.');
+      if (!backupPassword || !backupPassword.trim()) {
+        showToast('Backup export cancelled.', 'warning');
+        return;
       }
+
+      const response = await sendMessage('EXPORT_VAULT', {
+        format: 'encrypted',
+        backupPassword: backupPassword.trim()
+      });
+      if (!response?.ok) {
+        showToast(response?.error || 'Failed to export vault.', 'error');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `securepass-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Vault exported successfully.', 'success');
     });
   }
 
   if (importVaultBtn) {
-    importVaultBtn.addEventListener('click', () => {
-      if (!requireUnlockedVault()) return;
+    importVaultBtn.addEventListener('click', async () => {
+      if (!(await ensureVaultAccessible('Unlock the vault to import a backup.'))) return;
       importVaultFile.click();
     });
   }
@@ -1877,20 +1929,32 @@ function attachEventListeners() {
       reader.onload = async (event) => {
         try {
           const entries = JSON.parse(event.target.result);
-          if (!Array.isArray(entries)) throw new Error('Invalid format');
+          if (!(await ensureVaultAccessible('Unlock the vault to import this backup.'))) {
+            importVaultFile.value = '';
+            return;
+          }
 
-          let count = 0;
-          for (const entry of entries) {
-            if (entry.site && entry.password) {
-              const { id, ...data } = entry;
-              await sendMessage('STORE_CREDENTIAL', {
-                entry: data,
-                passphrase: state.passphrase
-              });
-              count++;
+          let backupPassword = '';
+          if (entries?.kind === 'securepass-encrypted-backup') {
+            backupPassword = await promptForMasterPassword('Enter the backup password used to encrypt this backup file.');
+            if (!backupPassword || !backupPassword.trim()) {
+              showToast('Import cancelled.', 'warning');
+              importVaultFile.value = '';
+              return;
             }
           }
-          showToast(`Imported ${count} entries.`, 'success');
+
+          const response = await sendMessage('IMPORT_VAULT', {
+            data: entries,
+            backupPassword: backupPassword ? backupPassword.trim() : ''
+          });
+          if (!response?.ok) {
+            showToast(response?.error || 'Import failed.', 'error');
+            importVaultFile.value = '';
+            return;
+          }
+
+          showToast(`Imported ${response.count} entries.`, 'success');
           await refreshVaultEntries();
         } catch (err) {
           showToast('Invalid JSON file.', 'error');
@@ -1903,20 +1967,16 @@ function attachEventListeners() {
 
   if (clearVaultBtn) {
     clearVaultBtn.addEventListener('click', async () => {
-      if (!requireUnlockedVault()) return;
+      if (!(await ensureVaultAccessible('Unlock the vault to clear its contents.'))) return;
       const confirmed = window.confirm('DANGER: This will permanently delete ALL entries in your vault. This action cannot be undone.\n\nAre you sure?');
       if (confirmed) {
-        const response = await sendMessage('LIST_CREDENTIALS');
-        if (response?.entries) {
-          for (const entry of response.entries) {
-            await sendMessage('DELETE_CREDENTIAL', {
-              id: entry.id,
-              passphrase: state.passphrase
-            });
-          }
-          showToast('Vault cleared.', 'success');
-          await refreshVaultEntries();
+        const response = await sendMessage('CLEAR_VAULT_ENTRIES');
+        if (!response?.ok) {
+          showToast(response?.error || 'Unable to clear vault.', 'error');
+          return;
         }
+        showToast('Vault cleared.', 'success');
+        await refreshVaultEntries();
       }
     });
   }
