@@ -1,5 +1,5 @@
 import { loadSettings } from './settings.js';
-import { getStorage, setStorage } from './storage.js';
+import { getStorage, setStorage } from './utils/storage.js';
 
 const API_URL = 'https://api.pwnedpasswords.com/range/';
 
@@ -36,7 +36,7 @@ export async function checkPassword(password) {
   const hash = await sha1(password);
   const prefix = hash.substring(0, 5);
   const suffix = hash.substring(5);
-  const cacheKey = `${prefix}`;
+  const cacheKey = prefix;
   const cache = await getCache();
 
   const entry = cache[cacheKey];

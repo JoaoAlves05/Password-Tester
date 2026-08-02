@@ -1,21 +1,25 @@
-import { getStorage, setStorage, removeStorage } from './storage.js';
-import * as storageUtils from './utils/storage.js';
+import {
+  getStorage, setStorage, removeStorage,
+  readLocalVaultRecordRaw, writeLocalVaultRecordRaw,
+  readSyncVaultRecordRaw, writeSyncVaultRecordRaw
+} from './utils/storage.js';
 import { loadSettings } from './settings.js';
 import { validateEntry, validateImportData } from './validation.js';
 import { bufferToBase64, base64ToBuffer } from './encoding.js';
-import { VAULT_KEY, META_KEY, CHUNK_SIZE, PRF_EVAL_LABEL, ALARM_NAME, SECUREPASS_DB_NAME } from './constants.js';
+import { VAULT_KEY, META_KEY, PRF_EVAL_LABEL, ALARM_NAME } from './constants.js';
 import { logger } from './logger.js';
 
 const BIOMETRIC_KEY = 'securepassBiometric';
 const TRUSTED_DEVICE_KEY = 'securepassTrustedDeviceKey';
-const ITERATIONS   = 600000;
+const ITERATIONS = 600000;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
-const STORAGE_PREFERENCE = ['sync', 'local'];
+
+const BRUTE_FORCE_MAX_ATTEMPTS = 5;
+const BRUTE_FORCE_LOCKOUT_MS = 30_000;
 
 let cache = { data: null };
 let unlockedPassphrase = null;
-
 let bruteForceAttempts = 0;
 let lockoutUntil = 0;
 
@@ -68,17 +72,13 @@ async function decryptData(record, passphrase) {
   return JSON.parse(DECODER.decode(decrypted));
 }
 
-async function getDB() {
-  return storageUtils.getDB();
-}
-
 async function loadVaultRecord() {
   const settings = await loadSettings();
   if (settings.useSync) {
-    return storageUtils.readSyncVaultRecordRaw();
+    return readSyncVaultRecordRaw();
   } else {
     try {
-      return await storageUtils.readLocalVaultRecordRaw();
+      return await readLocalVaultRecordRaw();
     } catch (error) {
       logger.error('Failed to load vault from IndexedDB:', error?.message || String(error));
       return null;
@@ -89,10 +89,15 @@ async function loadVaultRecord() {
 async function saveVaultRecord(record) {
   const settings = await loadSettings();
   if (settings.useSync) {
-    return storageUtils.writeSyncVaultRecordRaw(record);
+    return writeSyncVaultRecordRaw(record);
   } else {
-    return storageUtils.writeLocalVaultRecordRaw(record);
+    return writeLocalVaultRecordRaw(record);
   }
+}
+
+async function getVaultTimeout() {
+  const settings = await loadSettings();
+  return settings.vaultTimeout || 15;
 }
 
 // --- Persistence & Auto-Lock Logic ---
@@ -124,35 +129,19 @@ async function updateActivity(timeoutMinutes) {
   }
 }
 
-async function restoreVaultState() {
-  // For security, do not attempt to restore unlocked vault from session storage.
-  // Passphrase is not stored in session in plaintext. Restoration must be
-  // performed explicitly by the user (manual unlock) or via biometric flow.
-  return false;
-}
+
 
 async function ensureUnlocked(passphrase, timeoutMinutes) {
-  // If cache is empty, try to restore from session first
   if (!cache.data) {
-    const restored = await restoreVaultState();
-    if (restored) {
-      // If restored, check if we need to update activity (usually ensureUnlocked is called before an operation)
-      // So yes, we will update activity below.
-    }
-  }
-
-  if (!cache.data) {
-    // Still locked, try to unlock with provided passphrase
     if (passphrase) {
       await unlockVault(passphrase, timeoutMinutes || 15);
     } else {
       throw new Error('Vault is locked');
     }
   } else {
-    // Already unlocked (or restored), update activity
     await updateActivity(timeoutMinutes || 15);
   }
-  
+
   return cache.data;
 }
 
@@ -192,26 +181,13 @@ export async function overwriteVaultEntries(entries, passphrase) {
 
   const data = { entries: Array.isArray(entries) ? entries : [] };
   await writeVault(data, pass);
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
-
-  try {
-    await updateActivity(timeout);
-  } catch (e) {
-    // Ignore session storage errors
-  }
-
+  await updateActivity(await getVaultTimeout());
   return data;
 }
 
 // --- Public API ---
 
 export async function vaultStatus() {
-  // Try to restore state if needed (lazy load)
-  if (!cache.data) {
-    await restoreVaultState();
-  }
-
   const record = await loadVaultRecord();
   return {
     initialized: Boolean(record),
@@ -226,18 +202,9 @@ export async function initializeVault(passphrase) {
   await saveVaultRecord(payload);
   cache.data = { entries: [] };
   unlockedPassphrase = passphrase;
-  const settings = await loadSettings();
-  
-  const timeout = settings.vaultTimeout || 15;
-  
   // Do not persist the plaintext passphrase in session storage for security.
   // Keep only activity metadata via updateActivity.
-  try {
-    await updateActivity(timeout);
-  } catch (e) {
-    // Ignore
-  }
-  
+  await updateActivity(await getVaultTimeout());
   return true;
 }
 
@@ -261,48 +228,40 @@ export async function unlockVault(passphrase, timeoutMinutes = 15) {
     lockoutUntil = 0;
   } catch (error) {
     bruteForceAttempts++;
-    if (bruteForceAttempts >= 5) {
-      lockoutUntil = Date.now() + (30 * 1000); // 30 sec lockout
+    if (bruteForceAttempts >= BRUTE_FORCE_MAX_ATTEMPTS) {
+      lockoutUntil = Date.now() + BRUTE_FORCE_LOCKOUT_MS;
       bruteForceAttempts = 0;
-      throw new Error('Invalid master password. Vault locked for 30 seconds.');
+      throw new Error(`Invalid master password. Vault locked for ${BRUTE_FORCE_LOCKOUT_MS / 1000} seconds.`);
     }
     throw new Error('Invalid master password');
   }
   cache.data = data;
   unlockedPassphrase = passphrase;
   // Do not persist the plaintext passphrase in session storage for security.
-  try {
-    await updateActivity(timeoutMinutes);
-  } catch (e) {
-    // Ignore session storage errors
-  }
-  
+  await updateActivity(timeoutMinutes);
   return data;
 }
 
 export async function lockVault() {
-  if (cache.data && cache.data.entries) {
-    for (let i = 0; i < cache.data.entries.length; i++) {
-        const entry = cache.data.entries[i];
-        entry.password = 0;
-        entry.username = 0;
-        entry.notes = 0;
+  if (cache.data?.entries) {
+    for (const entry of cache.data.entries) {
+      entry.password = 0;
+      entry.username = 0;
+      entry.notes = 0;
     }
   }
   cache.data = null;
   unlockedPassphrase = null;
-  
   try {
     await removeStorage('session', ['vaultLastActivity', 'vaultTimeoutMinutes']);
     await chrome.alarms.clear(ALARM_NAME);
-  } catch (e) {
+  } catch {
     // Ignore
   }
 }
 
 export async function storeCredential(entry, passphrase) {
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
+  const timeout = await getVaultTimeout();
   const data = await ensureUnlocked(passphrase, timeout);
   const normalized = normalizeEntry(entry);
   data.entries = data.entries || [];
@@ -318,8 +277,7 @@ export async function storeCredential(entry, passphrase) {
 
 export async function updateCredential(id, updates, passphrase) {
   if (!id) throw new Error('Missing credential id');
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
+  const timeout = await getVaultTimeout();
   const data = await ensureUnlocked(passphrase, timeout);
   data.entries = data.entries || [];
   const index = data.entries.findIndex(item => item.id === id);
@@ -337,8 +295,7 @@ export async function updateCredential(id, updates, passphrase) {
 
 export async function deleteCredential(id, passphrase) {
   if (!id) throw new Error('Missing credential id');
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
+  const timeout = await getVaultTimeout();
   const data = await ensureUnlocked(passphrase, timeout);
   data.entries = data.entries || [];
   const index = data.entries.findIndex(item => item.id === id);
@@ -353,54 +310,32 @@ export async function deleteCredential(id, passphrase) {
 }
 
 export async function changeMasterPassword(oldPassphrase, newPassphrase) {
-  if (!newPassphrase) {
-    throw new Error('New master password required');
-  }
+  if (!newPassphrase) throw new Error('New master password required');
   const record = await loadVaultRecord();
-  if (!record) {
-    throw new Error('Vault not initialized');
-  }
-  let data;
+  if (!record) throw new Error('Vault not initialized');
   const currentPassphrase = oldPassphrase || unlockedPassphrase;
-  if (!currentPassphrase) {
-    throw new Error('Current master password required');
-  }
+  if (!currentPassphrase) throw new Error('Current master password required');
+  let data;
   try {
     data = await decryptData(record, currentPassphrase);
-  } catch (error) {
+  } catch {
     throw new Error('Invalid current master password');
   }
   const newRecord = await encryptData(data, newPassphrase);
   await saveVaultRecord(newRecord);
   cache.data = data;
   unlockedPassphrase = newPassphrase;
-  
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
-  
   // Do not persist plaintext passphrase. Update activity metadata only.
-  try {
-    await updateActivity(timeout);
-  } catch (e) {
-    // Ignore
-  }
+  await updateActivity(await getVaultTimeout());
 }
 
 export async function listCredentials() {
-  // Try restore if needed
-  if (!cache.data) {
-    await restoreVaultState();
-  }
-  
   if (cache.data) {
-    // Update activity on list? Yes, viewing the vault counts as activity.
-    // We need to know the timeout.
-    // We can get it from session or settings.
     try {
-        const session = await getStorage('session', 'vaultTimeoutMinutes');
-        const timeout = session.vaultTimeoutMinutes || 15;
-       await updateActivity(timeout);
-    } catch(e) {}
+      const session = await getStorage('session', 'vaultTimeoutMinutes');
+      const timeout = session.vaultTimeoutMinutes || 15;
+      await updateActivity(timeout);
+    } catch {}
   }
 
   return cache.data ? [...(cache.data.entries || [])] : [];
@@ -409,9 +344,7 @@ export async function listCredentials() {
 export async function importVaultData(data, passphrase) {
   const cleanData = validateImportData(data);
   const newEntries = cleanData.entries;
-
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
+  const timeout = await getVaultTimeout();
 
   await ensureUnlocked(passphrase, timeout);
 
@@ -430,10 +363,8 @@ export async function importVaultData(data, passphrase) {
 }
 
 export async function keepAlive() {
-  const settings = await loadSettings();
-  const timeout = settings.vaultTimeout || 15;
   if (cache.data) {
-    await updateActivity(timeout);
+    await updateActivity(await getVaultTimeout());
     return true;
   }
   return false;

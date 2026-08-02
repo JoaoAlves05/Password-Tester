@@ -29,7 +29,7 @@ import {
 } from '../src/cryptoVault.js';
 import { createVaultBackup, validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
 import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
-import { VAULT_KEY, META_KEY, CHUNK_SIZE, SECUREPASS_DB_NAME, BIOMETRIC_SESSION_PASSPHRASE_KEY, ALARM_NAME } from '../src/constants.js';
+import { VAULT_KEY, META_KEY, SECUREPASS_DB_NAME, BIOMETRIC_SESSION_PASSPHRASE_KEY, ALARM_NAME } from '../src/constants.js';
 import { logger } from '../src/logger.js';
 import * as storageUtils from '../src/utils/storage.js';
 
@@ -51,10 +51,6 @@ async function clearBiometricSessionPassphrase() {
 
 function isExtensionPageSender(sender) {
   return Boolean(sender && sender.id === chrome.runtime.id && !sender.tab);
-}
-
-async function deleteIndexedDb(name) {
-  return storageUtils.deleteIndexedDb(name);
 }
 
 async function clearClipboardAlarmState() {
@@ -79,7 +75,7 @@ async function clearAllUserData() {
     storageUtils.clearStorage('session'),
     clearClipboardAlarmState(),
     clearVaultAutoLockAlarmState(),
-    deleteIndexedDb(SECUREPASS_DB_NAME),
+    storageUtils.deleteIndexedDb(SECUREPASS_DB_NAME),
   ]);
 }
 
@@ -94,29 +90,9 @@ function recordsEqual(recordA, recordB) {
   return JSON.stringify(recordA) === JSON.stringify(recordB);
 }
 
-async function getDB() {
-  return storageUtils.getDB();
-}
-
-async function readLocalVaultRecordRaw() {
-  return storageUtils.readLocalVaultRecordRaw();
-}
-
-async function writeLocalVaultRecordRaw(record) {
-  return storageUtils.writeLocalVaultRecordRaw(record);
-}
-
-async function readSyncVaultRecordRaw() {
-  return storageUtils.readSyncVaultRecordRaw();
-}
-
-async function writeSyncVaultRecordRaw(record) {
-  return storageUtils.writeSyncVaultRecordRaw(record);
-}
-
 async function analyzeSyncTransition(targetUseSync) {
-  const localRecord = await readLocalVaultRecordRaw();
-  const syncRecord = await readSyncVaultRecordRaw();
+  const localRecord = await storageUtils.readLocalVaultRecordRaw();
+  const syncRecord = await storageUtils.readSyncVaultRecordRaw();
 
   const hasLocal = Boolean(localRecord);
   const hasSync = Boolean(syncRecord);
@@ -154,30 +130,30 @@ async function analyzeSyncTransition(targetUseSync) {
 }
 
 async function applySyncTransition(targetUseSync, strategy) {
-  const localRecord = await readLocalVaultRecordRaw();
-  const syncRecord = await readSyncVaultRecordRaw();
+  const localRecord = await storageUtils.readLocalVaultRecordRaw();
+  const syncRecord = await storageUtils.readSyncVaultRecordRaw();
   const hasLocal = Boolean(localRecord);
   const hasSync = Boolean(syncRecord);
 
   if (targetUseSync) {
     if (strategy === 'keep-local') {
       if (!hasLocal) throw new Error('No local vault data to keep.');
-      await writeSyncVaultRecordRaw(localRecord);
+      await storageUtils.writeSyncVaultRecordRaw(localRecord);
     } else if (strategy === 'use-sync') {
       if (!hasSync) throw new Error('No sync vault data available.');
     } else if (strategy === 'copy-local-to-sync') {
       if (!hasLocal) throw new Error('No local vault data to copy.');
-      await writeSyncVaultRecordRaw(localRecord);
+      await storageUtils.writeSyncVaultRecordRaw(localRecord);
     }
   } else {
     if (strategy === 'use-sync') {
       if (!hasSync) throw new Error('No sync vault data available.');
-      await writeLocalVaultRecordRaw(syncRecord);
+      await storageUtils.writeLocalVaultRecordRaw(syncRecord);
     } else if (strategy === 'keep-local') {
       if (!hasLocal) throw new Error('No local vault data to keep.');
     } else if (strategy === 'copy-sync-to-local') {
       if (!hasSync) throw new Error('No sync vault data to copy.');
-      await writeLocalVaultRecordRaw(syncRecord);
+      await storageUtils.writeLocalVaultRecordRaw(syncRecord);
     }
   }
 
@@ -654,7 +630,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
           // Clean up session
           await storageUtils.removeStorage('session', `biometric_${sessionId}`);
-          // Notify content script
           // Notify content script
           if (tabId) {
             try {

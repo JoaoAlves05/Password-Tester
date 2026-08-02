@@ -55,17 +55,13 @@ A persistent **content script** enriches every web page with an inline assistant
 - The vault is protected by a **master password** — never stored in plaintext, never sent over the network.
 - A **metadata layer** (`id`, `username`, `site`) is stored separately, allowing the extension to show credential stubs even when the vault is locked.
 
-### 🛡️ Biometric Unlock Modes
+### 🛡️ Biometric Unlock (WebAuthn + PRF)
 - **PRF-backed unlock** is the preferred path. When the authenticator exposes WebAuthn PRF output, the vault unlocks without asking for the master password.
 - **Verify-only fallback** uses Windows Hello / Touch ID / device PIN to verify identity, then seeds the browser session once with the master password on non-PRF devices.
 - **Trusted Device mode** is optional and disabled by default. It stores a local unlock secret on the device so biometric unlock can continue after browser restarts on non-PRF hardware.
-- The setup flow detects PRF capability during a real assertion, not just during credential creation, so the saved mode matches actual device behavior.
-
-### 🛡️ Biometric Unlock (WebAuthn + PRF)
-- Supports **passkey-based vault unlock** via the [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension).
-- The master password is encrypted with an AES-256-GCM key derived from the biometric PRF output via **HKDF-SHA-256**, stored only as ciphertext.
-- On devices without PRF, SecurePass can fall back to verify-only or Trusted Device mode depending on the user's explicit preference.
-- Registration and management of biometric unlock live in the popup's **Settings panel → Security** section. Once enabled, a **Biometric Unlock** button appears on the vault unlock screen alongside the master password field.
+- The master password is encrypted with an AES-256-GCM key derived from the biometric PRF output via **HKDF-SHA-256**; on non-PRF devices it falls back to verify-only or Trusted Device mode depending on the user's explicit preference.
+- The setup flow detects PRF capability during a real assertion, not just during credential creation, so the saved mode matches actual device behaviour.
+- Registration and management of biometric unlock live in the popup's **Settings panel → Security** section. Once enabled, a **Biometric Unlock** button appears on the vault unlock screen.
 
 ### ⚡ Intelligent Inline Assistant
 - A small floating button appears next to every `<input type="password">` field on any website.
@@ -82,7 +78,7 @@ A persistent **content script** enriches every web page with an inline assistant
 ### 🔒 Auto-Lock & Brute-Force Protection
 - Configurable inactivity timeout (1 – 60 min, default 15 min) via both the **Chrome Alarms API** and **Idle API** for redundancy.
 - On lock, sensitive data is **zeroed out in memory** before the cache is cleared.
-- **5 failed unlock attempts** trigger a 30-second lockout to prevent brute-force attacks.
+- After 5 consecutive failed unlock attempts a 30-second lockout is triggered. Both thresholds are defined as named constants (`BRUTE_FORCE_MAX_ATTEMPTS`, `BRUTE_FORCE_LOCKOUT_MS`) in `cryptoVault.js`.
 - The vault also auto-locks when the OS reports an idle or locked state.
 
 ### ☁️ Safe Chrome Sync
@@ -187,7 +183,10 @@ SecurePass/
 │   ├── formAnalyzer.js        # Form context detection & HTML5 constraint extraction
 │   ├── validation.js          # Input sanitisation and validation (XSS-safe)
 │   ├── settings.js            # Settings load/save with sync support
-│   └── storage.js             # Thin abstraction over chrome.storage
+│   ├── encoding.js            # Base64 encode/decode helpers
+│   ├── logger.js              # Secure, redaction-aware logger with in-memory ring buffer
+│   └── utils/
+│       └── storage.js         # Unified chrome.storage & IndexedDB abstraction
 ├── offscreen.html             # Offscreen document for clipboard operations (MV3)
 └── offscreen.js               # Clipboard clear logic
 ```
@@ -225,7 +224,7 @@ The cryptographic backbone of the extension.
 |---|---|---|
 | `generatePassword` | `(constraints?) → string` | Generates a CSPRNG password respecting site constraints |
 
-Constraints accepted: `length`, `minLength`, `maxLength`, `pattern` (regex), `customRequirements` (`requiresUppercase`, `requiresLowercase`, `requiresNumber`, `requiresSymbol`), `avoidSimilar`, `confirmField`.
+Constraints accepted: `length`, `minLength`, `maxLength`, `pattern` (regex), `customRequirements` (`requiresUppercase`, `requiresLowercase`, `requiresNumber`, `requiresSymbol`), `avoidSimilar`.
 
 ### `src/passwordStrength.js`
 
@@ -408,7 +407,6 @@ Contributions are welcome! Please follow these guidelines:
 3. Keep pull requests focused and small.
 4. If you touch any cryptographic logic, include tests or a clear manual verification procedure.
 5. Submit a PR with a clear description of what changed and why.
-# Note: Fork this repository on GitHub first. Then replace `<your-username>` below with your GitHub username when cloning your fork.
 
 ```bash
 # Clone your fork

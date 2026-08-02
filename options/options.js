@@ -1,5 +1,5 @@
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from '../src/settings.js';
-import { onStorageChanged } from '../src/storage.js';
+import { onStorageChanged } from '../src/utils/storage.js';
 
 const form = document.getElementById('settingsForm');
 const statusEl = document.getElementById('status');

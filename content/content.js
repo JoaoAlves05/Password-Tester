@@ -581,7 +581,7 @@
   // ── Resolve theme ──
   async function resolveThemeClass() {
     try {
-      const storage = await import(chrome.runtime.getURL('src/storage.js'));
+      const storage = await import(chrome.runtime.getURL('src/utils/storage.js'));
       const syncInfo = await storage.getStorage('local', 'settingsSync');
       const area = syncInfo?.settingsSync?.useSync ? 'sync' : 'local';
       const stored = await storage.getStorage(area, 'settings');
@@ -604,7 +604,7 @@
     });
   }
 
-  const storageModule = await import(chrome.runtime.getURL('src/storage.js'));
+  const storageModule = await import(chrome.runtime.getURL('src/utils/storage.js'));
   const removeStorageListener = storageModule.onStorageChanged((changes, areaName) => {
     if (areaName === 'local' && changes.settingsSync) updateAllThemes();
     if (changes.settings) updateAllThemes();

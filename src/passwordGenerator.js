@@ -112,10 +112,6 @@ export async function generatePassword(constraints = {}) {
       }
     }
 
-    if (constraints.confirmField) {
-      constraints.confirmField.value = password;
-      constraints.confirmField.dispatchEvent(new Event('input', { bubbles: true }));
-    }
     return password;
   }
 

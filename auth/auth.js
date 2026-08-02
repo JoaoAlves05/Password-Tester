@@ -1,5 +1,5 @@
 import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
-import { getStorage } from '../src/storage.js';
+import { getStorage } from '../src/utils/storage.js';
 
 const params    = new URLSearchParams(location.search);
 const sessionId = params.get('sessionId');

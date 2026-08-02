@@ -1,4 +1,4 @@
-import { getStorage, setStorage } from './storage.js';
+import { getStorage, setStorage } from './utils/storage.js';
 
 export const DEFAULT_SETTINGS = {
   theme: 'system',

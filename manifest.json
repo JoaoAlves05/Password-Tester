@@ -42,7 +42,10 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/*.js",
+        "src/encoding.js",
+        "src/formAnalyzer.js",
+        "src/passwordStrength.js",
+        "src/utils/storage.js",
         "popup/popup.css",
         "options/options.css",
         "auth/auth.html",

@@ -2,7 +2,7 @@ import { evaluatePassword } from '../src/passwordStrength.js';
 import { loadSettings, saveSettings } from '../src/settings.js';
 import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
 import { logger } from '../src/logger.js';
-import { getStorage, onStorageChanged } from '../src/storage.js';
+import { getStorage, onStorageChanged } from '../src/utils/storage.js';
 
 const ICONS = {
   sun:
