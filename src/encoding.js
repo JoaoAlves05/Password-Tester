@@ -1,5 +1,16 @@
+/**
+ * Converts an ArrayBuffer to a Base64 string.
+ * Uses chunked processing to avoid "Maximum call stack size exceeded"
+ * errors that occur with the spread operator on large buffers (>~65 KB).
+ */
 export function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 export function base64ToBuffer(b64) {

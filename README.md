@@ -161,13 +161,15 @@ A persistent **content script** enriches every web page with an inline assistant
 SecurePass/
 ├── manifest.json              # Extension manifest (Manifest V3)
 ├── background/
-│   └── serviceWorker.js       # Background service worker — message handler & auto-lock
+│   └── serviceWorker.js       # Background service worker — Map-based message router
 ├── content/
-│   └── content.js             # Inline assistant injected into every web page
+│   ├── content.js             # Bootstrap script injected into every web page
+│   └── modules/               # ES modules for UI, autofill, and biometrics
 ├── popup/
 │   ├── popup.html             # Extension popup (Tester / Generator / Vault tabs + Settings panel)
 │   ├── popup.css              # Popup styles (glassmorphism, dark/light theme)
-│   └── popup.js               # Popup logic
+│   ├── popup.js               # Popup bootstrap orchestrator
+│   └── modules/               # Decomposed UI modules (vault, generator, tester, etc.)
 ├── options/
 │   ├── options.html           # Standalone settings page (opened via right-click → Options)
 │   ├── options.css            # Settings page styles
@@ -176,6 +178,7 @@ SecurePass/
 │   ├── auth.html              # WebAuthn helper page loaded during biometric flow
 │   └── auth.js                # Triggers navigator.credentials.get() for biometric assertion
 ├── src/
+│   ├── messageHandlers/       # Modular background event handlers
 │   ├── cryptoVault.js         # Core vault: PBKDF2, AES-GCM, biometric PRF helpers
 │   ├── passwordGenerator.js   # Cryptographically secure password generation (CSPRNG)
 │   ├── passwordStrength.js    # Entropy scoring, crack-time estimation, suggestions

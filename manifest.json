@@ -49,7 +49,8 @@
         "popup/popup.css",
         "options/options.css",
         "auth/auth.html",
-        "auth/auth.js"
+        "auth/auth.js",
+        "content/modules/*"
       ],
       "matches": ["<all_urls>"]
     }

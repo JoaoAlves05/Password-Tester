@@ -1,668 +1,200 @@
-import { evaluatePassword } from '../src/passwordStrength.js';
-import { loadSettings, saveSettings } from '../src/settings.js';
-import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
+import { sendMessage } from './modules/messaging.js';
+import { showToast, initToast } from './modules/toast.js';
+import { applyTheme } from './modules/theme.js';
+import { attachGeneratorListeners, syncGeneratorControls } from './modules/generator.js';
+import { attachTesterListeners, updateStrength } from './modules/tester.js';
+import { attachSettingsListeners, syncSettingsView } from './modules/settings.js';
+import {
+  renderEntries, handleEntrySubmit, handleUnlock, handleCreateMaster,
+  changeMasterPassword, ensureVaultAccessible, lockVault, resolveUnlockSetup
+} from './modules/vault.js';
+import { loadSettings } from '../src/settings.js';
+import { onStorageChanged, getStorage } from '../src/utils/storage.js';
 import { logger } from '../src/logger.js';
-import { getStorage, onStorageChanged } from '../src/utils/storage.js';
+import { base64ToBuffer, bufferToBase64 } from '../src/encoding.js';
 
-const ICONS = {
-  sun:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>',
-  moon:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14.5A8.38 8.38 0 0 1 12.5 3 6.5 6.5 0 1 0 21 14.5z"></path></svg>',
-  eye:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
-  eyeOff:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.77 21.77 0 0 1 5.06-6.88"></path><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.16 4.19"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>',
-  copy:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
-  arrowRight:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>',
-  lock:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="11" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>',
-  edit:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>',
-  trash:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>'
+export const ICONS = {
+  key: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>`,
+  copy: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
+  edit: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+  trash: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
+  eye: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`,
+  lock: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  arrowRight: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`
 };
 
-const passwordInput = document.getElementById('passwordInput');
-const strengthBar = document.getElementById('strengthBar');
-const strengthVerdict = document.getElementById('strengthVerdict');
-const entropyEl = document.getElementById('entropy');
-const crackTimeEl = document.getElementById('crackTime');
-const suggestionsList = document.getElementById('suggestionsList');
-const suggestionsEmpty = document.getElementById('suggestionsEmpty');
-const hibpStatus = document.getElementById('hibpStatus');
-const hibpButton = document.getElementById('checkHibp');
-const togglePasswordBtn = document.getElementById('togglePassword');
-const copyTestPasswordBtn = document.getElementById('copyTestPassword');
-// const themeToggle = document.getElementById('themeToggle'); // Removed in new UI
+export const state = {
+  settings: null,
+  passphrase: null,
+  vaultUnlocked: false,
+  vaultInitialized: null,
+  entries: [],
+  filter: '',
+  inactivityTimer: null,
+  editingEntryId: null,
+  generatorPassword: ''
+};
+
+// DOM Elements
+const viewTabs = document.querySelectorAll('.tab');
+const views = document.querySelectorAll('.view');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const settingsPanel = document.getElementById('settingsPanel');
 const openSettingsBtn = document.getElementById('openSettings');
 const closeSettingsBtn = document.getElementById('closeSettings');
-const settingsPanel = document.getElementById('settingsPanel');
-const themeRadios = document.querySelectorAll('input[name="appearanceTheme"]');
-const autoLockRange = document.getElementById('autoLockRange');
-const autoLockLabel = document.getElementById('autoLockLabel');
-const syncToggle = document.getElementById('syncToggle');
-const trustedDeviceToggle = document.getElementById('trustedDeviceToggle');
-const clipboardRange = document.getElementById('clipboardRange');
-const clipboardLabel = document.getElementById('clipboardLabel');
-const hibpCacheRange = document.getElementById('hibpCacheRange');
-const hibpCacheLabel = document.getElementById('hibpCacheLabel');
-const defaultLengthRange = document.getElementById('defaultLengthRange');
-const defaultLengthLabel = document.getElementById('defaultLengthLabel');
-const defaultUpper = document.getElementById('defaultUpper');
-const defaultLower = document.getElementById('defaultLower');
-const defaultNumbers = document.getElementById('defaultNumbers');
-const defaultSymbols = document.getElementById('defaultSymbols');
-const exportVaultBtn = document.getElementById('exportVault');
-const importVaultBtn = document.getElementById('importVaultBtn');
-const importVaultFile = document.getElementById('importVaultFile');
-const clearVaultBtn = document.getElementById('clearVault');
-const toastEl = document.getElementById('toast');
-const viewTabs = document.querySelectorAll('.nav-item');
-const navIndicator = document.getElementById('navIndicator');
-const TAB_ORDER = ['generator', 'tester', 'vault'];
-const views = {
-  generator: document.getElementById('view-generator'),
-  tester: document.getElementById('view-tester'),
-  vault: document.getElementById('view-vault')
-};
-
-const lengthRange = document.getElementById('lengthRange');
-const lengthValue = document.getElementById('lengthValue');
-const includeLower = document.getElementById('includeLower');
-const includeUpper = document.getElementById('includeUpper');
-const includeNumbers = document.getElementById('includeNumbers');
-const includeSymbols = document.getElementById('includeSymbols');
-const avoidSimilar = document.getElementById('avoidSimilar');
-const generatorStatus = document.getElementById('generatorStatus');
-const generateButton = document.getElementById('generatePassword');
-const generatedResult = document.getElementById('generatedResult');
-const copyGeneratedBtn = document.getElementById('copyGenerated');
-const useForTestBtn = document.getElementById('useForTest');
-const saveGeneratedBtn = document.getElementById('saveGenerated');
-const saveTestedBtn = document.getElementById('saveTested');
-
-const vaultLockedPanel = document.getElementById('vaultLocked');
-const vaultUnlockedPanel = document.getElementById('vaultUnlocked');
-const createMasterSection = document.getElementById('createMaster');
-const unlockMasterSection = document.getElementById('unlockMaster');
-const biometricUnlockContainer = document.getElementById('biometricUnlockContainer');
-const biometricUnlockBtn = document.getElementById('biometricUnlockBtn');
-const createMasterForm = document.getElementById('createMasterForm');
-const unlockForm = document.getElementById('unlockForm');
-const vaultPassphraseInput = document.getElementById('vaultPassphrase');
-const newMasterInput = document.getElementById('newMaster');
-const confirmMasterInput = document.getElementById('confirmMaster');
-const vaultList = document.getElementById('vaultList');
-const vaultEmpty = document.getElementById('vaultEmpty');
+const addEntryBtn = document.getElementById('addEntry');
+const changeMasterBtn = document.getElementById('changeMasterBtn');
+const lockVaultBtn = document.getElementById('lockVault');
 const vaultSearch = document.getElementById('vaultSearch');
 const searchToggle = document.getElementById('searchToggle');
-const searchContainer = document.querySelector('.search-container');
-const addEntryBtn = document.getElementById('addEntry');
-const changeMasterBtn = document.getElementById('changeMaster');
-const lockVaultBtn = document.getElementById('lockVault');
-
-const modalBackdrop = document.getElementById('modalBackdrop');
-const entryModal = document.getElementById('entryModal');
-const entryForm = document.getElementById('entryForm');
-const entryModalTitle = document.getElementById('entryModalTitle');
-const entrySiteInput = document.getElementById('entrySite');
-const entryUsernameInput = document.getElementById('entryUsername');
-const entryPasswordInput = document.getElementById('entryPassword');
-const entryNotesInput = document.getElementById('entryNotes');
-
-const masterModal = document.getElementById('masterModal');
-const masterForm = document.getElementById('masterForm');
-const currentMasterInput = document.getElementById('currentMaster');
-const nextMasterInput = document.getElementById('nextMaster');
-const confirmNextMasterInput = document.getElementById('confirmNextMaster');
+const searchContainer = document.getElementById('searchContainer');
+const biometricUnlockBtn = document.getElementById('biometricUnlockBtn');
 const biometricInlineAuth = document.getElementById('biometricInlineAuth');
 const biometricInlinePassword = document.getElementById('biometricInlinePassword');
-const biometricInlineConfirm = document.getElementById('biometricInlineConfirm');
 const biometricInlineCancel = document.getElementById('biometricInlineCancel');
+const biometricInlineConfirm = document.getElementById('biometricInlineConfirm');
+const exportVaultBtn = document.getElementById('exportVault');
+const importVaultBtn = document.getElementById('importVault');
+const importVaultFile = document.getElementById('importVaultFile');
+const clearVaultBtn = document.getElementById('clearVault');
 const unlockSetupModal = document.getElementById('unlockSetupModal');
 const unlockSetupForm = document.getElementById('unlockSetupForm');
 const unlockSetupPassword = document.getElementById('unlockSetupPassword');
-const unlockSetupLead = document.getElementById('unlockSetupLead');
+const entryModal = document.getElementById('entryModal');
+const masterModal = document.getElementById('masterModal');
+const vaultLockedPanel = document.getElementById('vaultLockedPanel');
+const vaultUnlockedPanel = document.getElementById('vaultUnlockedPanel');
+const createMasterSection = document.getElementById('createMasterSection');
+const unlockMasterSection = document.getElementById('unlockMasterSection');
+const biometricUnlockContainer = document.getElementById('biometricUnlockContainer');
 
-const THEMES = ['system', 'dark', 'light'];
-const revealTimers = new Map();
-let settingsSaveTimeout = null;
-let unlockSetupResolver = null;
+initToast(document.getElementById('toast'));
 
-function sanitizeValue(value, maxLength = 1024, trim = true) {
+export function sanitizeValue(value, maxLength, noSpaces = false) {
   if (typeof value !== 'string') return '';
-  const cleaned = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-  const normalized = trim ? cleaned.trim() : cleaned;
-  return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+  let clean = value.substring(0, maxLength);
+  if (noSpaces) clean = clean.replace(/\s+/g, '');
+  return clean.replace(/[<>]/g, ''); // Basic anti-XSS
 }
 
-const state = {
-  settings: null,
-  vaultUnlocked: false,
-  vaultInitialized: null,
-  passphrase: null,
-  entries: [],
-  filter: '',
-  generatorPassword: '',
-  inactivityTimer: null,
-  currentView: 'tester',
-  editingEntryId: null,
-  biometricAutoTriggered: false
-};
-
-function systemPrefersDark() {
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+export function resetInactivityTimer() {
+  if (state.inactivityTimer) clearTimeout(state.inactivityTimer);
+  if (!state.settings || !state.vaultUnlocked) return;
+  const timeoutMs = (state.settings.vaultTimeout || 15) * 60 * 1000;
+  state.inactivityTimer = setTimeout(() => {
+    lockVault(true);
+  }, timeoutMs);
 }
 
-function resolveTheme(theme) {
-  if (theme === 'system') {
-    return systemPrefersDark() ? 'dark' : 'light';
-  }
-  return theme;
-}
-
-function applyTheme(theme) {
-  const resolved = resolveTheme(theme);
-  document.body.dataset.theme = resolved;
-  updateThemeToggleIcon();
-}
-
-function scheduleSettingsSave() {
-  if (!state.settings) return;
-  clearTimeout(settingsSaveTimeout);
-  settingsSaveTimeout = setTimeout(() => {
-    saveSettings(state.settings).catch(() => {
-      showToast('Unable to save preferences.', 'warning');
-    });
-  }, 250);
-}
-
-function showToast(message, variant = 'info') {
-  if (!toastEl) return;
-  toastEl.textContent = message;
-  toastEl.classList.remove('visible', 'success', 'error', 'warning');
-  if (variant !== 'info') {
-    toastEl.classList.add(variant);
-  }
-  requestAnimationFrame(() => {
-    toastEl.classList.add('visible');
-  });
-  setTimeout(() => {
-    toastEl.classList.remove('visible', 'success', 'error', 'warning');
-  }, 3200);
-}
-
-function mapScoreToColor(score) {
-  if (score >= 0.8) return 'linear-gradient(90deg, #22c55e, #16a34a)';
-  if (score >= 0.6) return 'linear-gradient(90deg, #84cc16, #16a34a)';
-  if (score >= 0.4) return 'linear-gradient(90deg, #f97316, #f59e0b)';
-  return 'linear-gradient(90deg, #ef4444, #dc2626)';
-}
-
-function scoreToBadge(score) {
-  if (score >= 0.75) return 'badge-strong';
-  if (score >= 0.45) return 'badge-medium';
-  return 'badge-weak';
-}
-
-function updateStrength(password) {
-  const { score, verdict, entropy, crackTime, suggestions } = evaluatePassword(password);
-  if (strengthBar) {
-    strengthBar.style.width = `${Math.max(score * 100, 6)}%`;
-    strengthBar.style.background = mapScoreToColor(score);
-  }
-  if (strengthVerdict) {
-    strengthVerdict.textContent = verdict;
-    strengthVerdict.classList.remove('badge-weak', 'badge-medium', 'badge-strong');
-    strengthVerdict.classList.add(scoreToBadge(score));
-  }
-  if (entropyEl) entropyEl.textContent = `Entropy: ${entropy} bits`;
-  if (crackTimeEl) crackTimeEl.textContent = `Crack time: ${crackTime}`;
-
-  if (suggestionsList) {
-    suggestionsList.innerHTML = '';
-    if (suggestions.length) {
-      if (suggestionsEmpty) suggestionsEmpty.classList.add('hidden');
-      suggestionsList.classList.add('visible');
-      suggestions.forEach(tip => {
-        const li = document.createElement('li');
-        li.textContent = tip;
-        suggestionsList.appendChild(li);
-      });
-    } else {
-      suggestionsList.classList.remove('visible');
-      if (suggestionsEmpty) suggestionsEmpty.classList.remove('hidden');
-    }
-  }
-
-  const tipsToggle = document.querySelector('[data-toggle-target="tipsContent"]');
-  const tipsContent = document.getElementById('tipsContent');
-  if (tipsToggle && tipsContent) {
-    const wasExpanded = tipsToggle.getAttribute('aria-expanded') === 'true';
-    if (suggestions.length) {
-      if (!wasExpanded) {
-        toggleCollapsible(tipsToggle);
-        tipsToggle.dataset.autoOpened = 'true';
-      }
-    } else {
-      if (tipsToggle.dataset.autoOpened === 'true' && wasExpanded) {
-        toggleCollapsible(tipsToggle);
-      }
-      delete tipsToggle.dataset.autoOpened;
-    }
+export function setView(viewId) {
+  views.forEach(v => v.classList.remove('active'));
+  viewTabs.forEach(t => t.classList.remove('active'));
+  const targetView = document.getElementById(`${viewId}View`);
+  const targetTab = document.querySelector(`.tab[data-view="${viewId}"]`);
+  if (targetView) targetView.classList.add('active');
+  if (targetTab) targetTab.classList.add('active');
+  if (viewId === 'tester' && state.generatorPassword) {
+    updateStrength(state.generatorPassword);
   }
 }
 
-function toggleCollapsible(button) {
-  if (!button) return;
-  const targetId = button.getAttribute('data-toggle-target');
-  if (!targetId) return;
-  const target = document.getElementById(targetId);
-  if (!target) return;
-  const isExpanded = button.getAttribute('aria-expanded') === 'true';
-  const nextState = !isExpanded;
-  button.setAttribute('aria-expanded', String(nextState));
-  target.hidden = !nextState;
-  updateToggleLabel(button, nextState);
-}
-
-function updateToggleLabel(button, expanded = false) {
-  if (!button) return;
-  const labels = button.dataset.labels ? button.dataset.labels.split('|').map(label => label.trim()) : null;
-  if (labels && labels.length === 2) {
-    button.textContent = expanded ? labels[1] : labels[0];
-  }
-}
-
-function setLoading(button, loading) {
-  if (!button) return;
-  button.disabled = loading;
-  button.dataset.loading = loading;
-}
-
-function updateThemeToggleIcon() {
-  // Deprecated in favor of radio buttons
-}
-
-function updatePasswordToggleIcon() {
-  if (!togglePasswordBtn || !passwordInput) return;
-  const isHidden = passwordInput.type === 'password';
-  togglePasswordBtn.innerHTML = isHidden ? ICONS.eye : ICONS.eyeOff;
-  togglePasswordBtn.setAttribute('aria-label', isHidden ? 'Show password' : 'Hide password');
-}
-
-function setupPasswordToggles() {
-  document.querySelectorAll('[data-toggle-password]').forEach(button => {
-    button.addEventListener('click', () => {
-      const targetId = button.dataset.togglePassword;
-      const input = document.getElementById(targetId);
-      if (!input) return;
-
-      const isHidden = input.type === 'password';
-      input.type = isHidden ? 'text' : 'password';
-      button.innerHTML = isHidden ? ICONS.eyeOff : ICONS.eye;
-      button.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
-    });
-  });
-}
-
-function syncSettingsView() {
-  if (!state.settings) return;
-  themeRadios.forEach(radio => {
-    radio.checked = radio.value === state.settings.theme;
-  });
-  const timeout = state.settings.vaultTimeout || 15;
-  autoLockRange.value = timeout;
-  autoLockLabel.textContent = `${timeout} min`;
-  syncToggle.checked = Boolean(state.settings.useSync);
-  if (trustedDeviceToggle) {
-    trustedDeviceToggle.checked = Boolean(state.settings.trustedDeviceMode);
-  }
-
-  const clipboardTimeout = state.settings.clipboardTimeout || 30;
-  if (clipboardRange) clipboardRange.value = clipboardTimeout;
-  if (clipboardLabel) clipboardLabel.textContent = clipboardTimeout === 0 ? 'Never' : `${clipboardTimeout}s`;
-
-  const hibpCache = state.settings.hibpCacheTtlHours || 24;
-  if (hibpCacheRange) hibpCacheRange.value = hibpCache;
-  if (hibpCacheLabel) hibpCacheLabel.textContent = hibpCache === 1 ? '1 hour' : `${hibpCache} hours`;
-
-  if (state.settings.generatorDefaults) {
-    const defs = state.settings.generatorDefaults;
-    if (defaultLengthRange) {
-      defaultLengthRange.value = defs.length || 16;
-      if (defaultLengthLabel) defaultLengthLabel.textContent = defs.length || 16;
-    }
-    if (defaultUpper) defaultUpper.checked = defs.uppercase !== false;
-    if (defaultLower) defaultLower.checked = defs.lowercase !== false;
-    if (defaultNumbers) defaultNumbers.checked = defs.numbers !== false;
-    if (defaultSymbols) defaultSymbols.checked = defs.symbols !== false;
-  }
-
-  updateThemeToggleIcon();
-}
-
-function openSettingsPanel() {
-  if (!settingsPanel) return;
+export function openSettingsPanel() {
+  settingsPanel.classList.add('visible');
   settingsPanel.setAttribute('aria-hidden', 'false');
-  // Move focus to the close button for accessibility
-  closeSettingsBtn?.focus();
+  document.body.style.overflow = 'hidden';
 }
 
-function closeSettingsPanel() {
-  if (!settingsPanel) return;
-  // Move focus back to the trigger button BEFORE hiding the panel
-  // This prevents the "aria-hidden element contains focus" error
-  openSettingsBtn?.focus();
+export function closeSettingsPanel() {
+  settingsPanel.classList.remove('visible');
   settingsPanel.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
 }
 
-async function sendMessage(type, payload = {}) {
-  return new Promise(resolve => {
-    chrome.runtime.sendMessage({ type, ...payload }, response => {
-      if (chrome.runtime.lastError) {
-        return resolve({ ok: false, error: chrome.runtime.lastError.message });
-      }
-      resolve(response || { ok: false, error: 'No response from background.' });
-    });
-  });
+export function openModal(id) {
+  const modalMap = { entryModal, masterModal, unlockSetupModal };
+  const modal = modalMap[id];
+  if (!modal) return;
+  modalBackdrop.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  const focusTarget = modal.querySelector('input, textarea, button');
+  if (focusTarget) setTimeout(() => focusTarget.focus(), 10);
 }
 
-async function copyToClipboard(value) {
-  try {
-    await navigator.clipboard.writeText(value);
+export function closeModal(id) {
+  const modalMap = { entryModal, masterModal, unlockSetupModal };
+  const modal = modalMap[id];
+  if (!modal) return;
 
-    const timeout = state.settings?.clipboardTimeout ?? 30;
-    if (timeout > 0) {
-      // Delegate clearing to background service worker (via alarms)
-      // so it persists even if popup is closed
-      await sendMessage('SCHEDULE_CLIPBOARD_CLEAR', { timeout });
-    }
+  if (id === 'unlockSetupModal') resolveUnlockSetup(null);
 
-    return true;
-  } catch (error) {
-    return false;
+  if (!modal.classList.contains('hidden')) {
+    modal.classList.add('hidden');
   }
-}
-
-function updateNavIndicator(activeTab) {
-  if (!navIndicator || !activeTab) return;
-  const nav = activeTab.parentElement;
-  const navRect = nav.getBoundingClientRect();
-  const tabRect = activeTab.getBoundingClientRect();
-  const navPadding = parseFloat(getComputedStyle(nav).paddingLeft) || 4;
-  const offsetX = tabRect.left - navRect.left - navPadding;
-  navIndicator.style.width = tabRect.width + 'px';
-  navIndicator.style.transform = `translateX(${offsetX}px)`;
-}
-
-function setView(view) {
-  if (!views[view]) return;
-  const oldView = state.currentView;
-  const oldIndex = TAB_ORDER.indexOf(oldView);
-  const newIndex = TAB_ORDER.indexOf(view);
-  state.currentView = view;
-
-  // Update tab active states
-  let activeTabEl = null;
-  viewTabs.forEach(tab => {
-    const isActive = tab.dataset.view === view;
-    tab.classList.toggle('active', isActive);
-    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    if (isActive) activeTabEl = tab;
-  });
-
-  // Slide the pill indicator
-  updateNavIndicator(activeTabEl);
-
-  // Directional content slide
-  const goingRight = newIndex > oldIndex;
-  Object.entries(views).forEach(([key, section]) => {
-    if (!section) return;
-    const isTarget = key === view;
-    // Remove old direction class
-    section.classList.remove('slide-right');
-    if (!isTarget) {
-      // Exiting view: set the exit direction
-      if (goingRight) {
-        // Old content exits to the left (default translateX(-20px))
-      } else {
-        // Old content exits to the right
-        section.classList.add('slide-right');
-      }
-    } else {
-      // Entering view: come from the opposite direction
-      if (goingRight) {
-        section.classList.add('slide-right');
-      }
-      // Force a reflow so the browser picks up the starting position
-      void section.offsetWidth;
-      section.classList.remove('slide-right');
-    }
-    section.classList.toggle('active', isTarget);
-  });
-}
-
-function resetInactivityTimer() {
-  if (!state.vaultUnlocked) return;
-  
-  // Notify background to keep session alive
-  sendMessage('KEEP_ALIVE').catch(() => {});
-
-  const minutes = state.settings?.vaultTimeout || 15;
-  clearTimeout(state.inactivityTimer);
-  state.inactivityTimer = setTimeout(async () => {
-    await lockVault();
-    showToast('Vault locked after inactivity.', 'warning');
-  }, minutes * 60 * 1000);
-}
-
-async function detectActiveOrigin() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.url) {
-      return new URL(tab.url).origin;
-    }
-  } catch (error) {
-    // ignore
+  if (!entryModal.classList.contains('hidden') || !masterModal.classList.contains('hidden') || !unlockSetupModal.classList.contains('hidden')) {
+    return;
   }
+  modalBackdrop.classList.add('hidden');
+}
+
+export async function detectActiveOrigin() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]?.url) {
+      const url = new URL(tabs[0].url);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return url.hostname;
+      }
+    }
+  } catch {}
   return '';
 }
 
-function clearRevealTimer(id) {
-  const timer = revealTimers.get(id);
-  if (timer) {
-    clearTimeout(timer);
-    revealTimers.delete(id);
-  }
-}
-
-function hidePasswordReveal(container, button, id) {
-  if (!container) return;
-  container.classList.add('hidden');
-  container.textContent = '';
-  if (button) {
-    button.innerHTML = ICONS.eye;
-    button.setAttribute('aria-label', 'Reveal password');
-  }
-  if (id) clearRevealTimer(id);
-}
-
-function createVaultIconButton(icon, label, extraClass = '') {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `vault-icon-btn${extraClass ? ` ${extraClass}` : ''}`;
-  button.setAttribute('aria-label', label);
-  button.innerHTML = icon;
-  return button;
-}
-
-function renderVaultEntries() {
-  if (!state.vaultUnlocked) {
-    if (vaultList) vaultList.innerHTML = '';
-    if (vaultEmpty) vaultEmpty.classList.add('hidden');
+export async function openEntryModal(entry = null) {
+  if (state.vaultUnlocked) {
+    resetInactivityTimer();
+  } else {
+    showToast('Unlock the vault first to continue.', 'warning');
+    setView('vault');
     return;
   }
-  const query = state.filter.toLowerCase();
-  const filtered = state.entries
-    .slice()
-    .filter(entry => {
-      if (!query) return true;
-      return (
-        entry.site.toLowerCase().includes(query) ||
-        entry.username.toLowerCase().includes(query)
-      );
-    })
-    .sort((a, b) => {
-      const siteCompare = a.site.localeCompare(b.site, undefined, { sensitivity: 'base' });
-      if (siteCompare !== 0) return siteCompare;
-      return a.username.localeCompare(b.username, undefined, { sensitivity: 'base' });
-    });
+  state.editingEntryId = entry ? entry.id : null;
+  document.getElementById('entryModalTitle').textContent = entry ? 'Update credential' : 'Save credential';
+  const { clearEntryForm } = await import('./modules/vault.js');
+  clearEntryForm();
 
-  if (vaultList) vaultList.innerHTML = '';
-  if (!filtered.length) {
-    if (vaultEmpty) vaultEmpty.classList.remove('hidden');
-    return;
+  const siteInput = document.getElementById('entrySite');
+  const userInput = document.getElementById('entryUsername');
+  const passInput = document.getElementById('entryPassword');
+  const noteInput = document.getElementById('entryNotes');
+
+  if (entry) {
+    if (siteInput) siteInput.value = entry.site || '';
+    if (userInput) userInput.value = entry.username || '';
+    if (passInput) passInput.value = entry.password || '';
+    if (noteInput) noteInput.value = entry.notes || '';
+  } else {
+    if (passInput) passInput.value = state.generatorPassword || document.getElementById('passwordInput')?.value || '';
+    if (siteInput && !siteInput.value) siteInput.value = await detectActiveOrigin();
   }
-  if (vaultEmpty) vaultEmpty.classList.add('hidden');
-
-  filtered.forEach(entry => {
-    const item = document.createElement('li');
-    item.className = 'vault-item';
-    item.dataset.id = entry.id;
-
-    const header = document.createElement('div');
-    header.className = 'vault-item-header';
-
-    const title = document.createElement('h3');
-    title.className = 'vault-site';
-    title.textContent = entry.site || 'Untitled';
-    header.appendChild(title);
-
-    const date = document.createElement('span');
-    date.className = 'vault-date';
-    const updated = new Date(entry.updatedAt || entry.createdAt);
-    date.textContent = updated.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    header.appendChild(date);
-
-    item.appendChild(header);
-
-    if (entry.username) {
-      const row = document.createElement('div');
-      row.className = 'vault-row';
-      const username = document.createElement('div');
-      username.className = 'vault-username';
-      
-      const userSVG = document.createElement('div');
-      userSVG.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="user-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-      
-      const userSpan = document.createElement('span');
-      userSpan.textContent = entry.username;
-      
-      username.appendChild(userSVG.firstChild);
-      username.appendChild(document.createTextNode(' '));
-      username.appendChild(userSpan);
-      
-      row.appendChild(username);
-      item.appendChild(row);
-    }
-
-    // Password Row
-    const passRow = document.createElement('div');
-    passRow.className = 'vault-row';
-    const passwordContainer = document.createElement('div');
-    passwordContainer.className = 'vault-password';
-
-    // Key Icon
-    const keyIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="user-icon"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>`;
-
-    const passText = document.createElement('span');
-    passText.className = 'vault-password-text';
-    passText.textContent = '••••••••••••';
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'vault-password-toggle';
-    toggleBtn.title = 'Show password';
-    toggleBtn.innerHTML = ICONS.eye;
-
-    let isRevealed = false;
-    toggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetInactivityTimer();
-      isRevealed = !isRevealed;
-
-      if (isRevealed) {
-        passText.textContent = entry.password;
-        toggleBtn.innerHTML = ICONS.eyeOff;
-        toggleBtn.title = 'Hide password';
-        clearRevealTimer(entry.id);
-        const timer = setTimeout(() => {
-          isRevealed = false;
-          passText.textContent = '••••••••••••';
-          toggleBtn.innerHTML = ICONS.eye;
-          toggleBtn.title = 'Show password';
-        }, 10000); // 10s auto-hide
-        revealTimers.set(entry.id, timer);
-      } else {
-        passText.textContent = '••••••••••••';
-        toggleBtn.innerHTML = ICONS.eye;
-        toggleBtn.title = 'Show password';
-        clearRevealTimer(entry.id);
-      }
-    });
-
-    passwordContainer.innerHTML = keyIcon;
-    passwordContainer.appendChild(passText);
-    passwordContainer.appendChild(toggleBtn);
-    passRow.appendChild(passwordContainer);
-    item.appendChild(passRow);
-
-    if (entry.notes) {
-      const notes = document.createElement('div');
-      notes.className = 'vault-notes';
-      notes.textContent = entry.notes;
-      item.appendChild(notes);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'vault-actions';
-
-    // Copy Button
-    const copyBtn = createVaultIconButton(ICONS.copy, 'Copy password');
-    copyBtn.addEventListener('click', async () => {
-      resetInactivityTimer();
-      const ok = await copyToClipboard(entry.password);
-      showToast(ok ? 'Password copied to clipboard.' : 'Unable to copy password.', ok ? 'success' : 'warning');
-    });
-
-    const editBtn = createVaultIconButton(ICONS.edit, 'Edit credential');
-    editBtn.addEventListener('click', () => {
-      openEntryModal(entry);
-    });
-
-    const deleteBtn = createVaultIconButton(ICONS.trash, 'Delete credential', 'danger');
-    deleteBtn.addEventListener('click', async () => {
-      const confirmed = window.confirm('Delete this credential from the vault?');
-      if (!confirmed) return;
-      await deleteCredential(entry.id);
-    });
-
-    actions.append(copyBtn, editBtn, deleteBtn);
-    item.appendChild(actions);
-    vaultList.appendChild(item);
-  });
+  openModal('entryModal');
+  resetInactivityTimer();
 }
 
-function renderVaultState() {
+export function openMasterModal() {
+  if (state.vaultUnlocked) {
+    resetInactivityTimer();
+  } else {
+    showToast('Unlock the vault first to continue.', 'warning');
+    setView('vault');
+    return;
+  }
+  document.getElementById('masterForm')?.reset();
+  openModal('masterModal');
+  resetInactivityTimer();
+}
+
+export function renderVaultState() {
   const showLocked = !state.vaultUnlocked;
   if (vaultLockedPanel) vaultLockedPanel.classList.toggle('hidden', !showLocked);
   if (vaultUnlockedPanel) vaultUnlockedPanel.classList.toggle('hidden', showLocked);
@@ -670,7 +202,6 @@ function renderVaultState() {
   if (unlockMasterSection) unlockMasterSection.classList.toggle('hidden', !state.vaultInitialized);
   
   if (!state.vaultUnlocked && state.vaultInitialized) {
-    // Check if biometric is enabled to show the unlock option
     sendMessage('BIOMETRIC_STATUS').then(res => {
       if (res?.enabled) {
         biometricUnlockContainer?.classList.remove('hidden');
@@ -686,659 +217,8 @@ function renderVaultState() {
   }
 }
 
-function clearEntryForm() {
-  entryForm.reset();
-  entrySiteInput.value = '';
-  entryUsernameInput.value = '';
-  entryPasswordInput.value = '';
-  entryNotesInput.value = '';
-}
-
-function closeModal(id) {
-  const modalMap = {
-    entryModal,
-    masterModal,
-    unlockSetupModal
-  };
-  const modal = modalMap[id];
-  if (!modal) return;
-
-  if (id === 'unlockSetupModal' && unlockSetupResolver) {
-    unlockSetupResolver(null);
-    unlockSetupResolver = null;
-  }
-
-  if (!modal.classList.contains('hidden')) {
-    modal.classList.add('hidden');
-  }
-  if (!entryModal.classList.contains('hidden') || !masterModal.classList.contains('hidden') || !unlockSetupModal.classList.contains('hidden')) {
-    return;
-  }
-  modalBackdrop.classList.add('hidden');
-  modalBackdrop.classList.add('hidden');
-}
-
-function openModal(id) {
-  const modalMap = {
-    entryModal,
-    masterModal,
-    unlockSetupModal
-  };
-  const modal = modalMap[id];
-  if (!modal) return;
-
-  modalBackdrop.classList.remove('hidden');
-  modal.classList.remove('hidden');
-  const focusTarget = modal.querySelector('input, textarea, button');
-  if (focusTarget) {
-    setTimeout(() => focusTarget.focus(), 10);
-  }
-}
-
-function promptForMasterPassword(message = 'Enter your master password to continue.') {
-  if (unlockSetupLead) unlockSetupLead.textContent = message;
-  if (unlockSetupForm) unlockSetupForm.reset();
-  openModal('unlockSetupModal');
-
-  return new Promise(resolve => {
-    unlockSetupResolver = resolve;
-  });
-}
-
-async function openEntryModal(entry = null) {
-  if (!requireUnlockedVault()) return;
-  state.editingEntryId = entry ? entry.id : null;
-  entryModalTitle.textContent = entry ? 'Update credential' : 'Save credential';
-  clearEntryForm();
-  if (entry) {
-    entrySiteInput.value = entry.site || '';
-    entryUsernameInput.value = entry.username || '';
-    entryPasswordInput.value = entry.password || '';
-    entryNotesInput.value = entry.notes || '';
-  } else {
-    entryPasswordInput.value = state.generatorPassword || passwordInput.value;
-    if (!entrySiteInput.value) {
-      entrySiteInput.value = await detectActiveOrigin();
-    }
-  }
-  openModal('entryModal');
-  resetInactivityTimer();
-}
-
-function openMasterModal() {
-  if (!requireUnlockedVault()) return;
-  masterForm.reset();
-  openModal('masterModal');
-  resetInactivityTimer();
-}
-
-function requireUnlockedVault() {
-  if (state.vaultUnlocked) {
-    resetInactivityTimer();
-    return true;
-  }
-  showToast('Unlock the vault first to continue.', 'warning');
-  setView('vault');
-  return false;
-}
-
-async function ensureVaultUnlockedWithPassphrase(promptLabel = 'Enter your master password to continue.') {
-  if (state.vaultUnlocked && state.passphrase) {
-    resetInactivityTimer();
-    return true;
-  }
-
-  const typed = await promptForMasterPassword(promptLabel);
-  const passphrase = (typed || '').trim();
-  if (!passphrase) {
-    showToast('Master password is required.', 'warning');
-    return false;
-  }
-
-  const timeoutMinutes = state.settings?.vaultTimeout || 15;
-  const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to unlock vault.', 'error');
-    return false;
-  }
-
-  state.passphrase = passphrase;
-  state.vaultUnlocked = true;
-  state.vaultInitialized = true;
-  state.entries = response.data?.entries || [];
-  renderVaultState();
-  renderVaultEntries();
-  resetInactivityTimer();
-  return true;
-}
-
-async function ensureVaultAccessible(promptLabel = 'Enter your master password to continue.') {
-  const statusRes = await sendMessage('VAULT_STATUS');
-  if (statusRes?.ok && statusRes.status?.unlocked) {
-    state.vaultUnlocked = true;
-    resetInactivityTimer();
-    return true;
-  }
-
-  const typed = await promptForMasterPassword(promptLabel);
-  const passphrase = (typed || '').trim();
-  if (!passphrase) {
-    showToast('Master password is required.', 'warning');
-    return false;
-  }
-
-  const timeoutMinutes = state.settings?.vaultTimeout || 15;
-  const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to unlock vault.', 'error');
-    return false;
-  }
-
-  state.passphrase = passphrase;
-  state.vaultUnlocked = true;
-  state.vaultInitialized = true;
-  state.entries = response.data?.entries || [];
-  renderVaultState();
-  renderVaultEntries();
-  resetInactivityTimer();
-  return true;
-}
-
-async function lockVault(showMessage = false) {
-  await sendMessage('LOCK_VAULT');
-  state.vaultUnlocked = false;
-  state.passphrase = null;
-  state.entries = [];
-  clearTimeout(state.inactivityTimer);
-  renderVaultState();
-  renderVaultEntries();
-  if (showMessage) {
-    showToast('Vault locked.', 'info');
-  }
-}
-
-async function refreshVaultEntries() {
-  if (!state.vaultUnlocked) return;
-  const response = await sendMessage('LIST_CREDENTIALS');
-  if (!response?.ok) {
-    return;
-  }
-  if (!response.unlocked) {
-    await lockVault();
-    return;
-  }
-  state.entries = response.entries || [];
-  renderVaultEntries();
-}
-
-async function deleteCredential(id) {
-  if (!requireUnlockedVault()) return;
-  const response = await sendMessage('DELETE_CREDENTIAL', {
-    id,
-    passphrase: state.passphrase
-  });
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to delete credential.', 'error');
-    return;
-  }
-  showToast('Credential removed from vault.', 'success');
-  await refreshVaultEntries();
-  resetInactivityTimer();
-}
-
-async function handleEntrySubmit(event) {
-  event.preventDefault();
-  if (!requireUnlockedVault()) return;
-  const site = sanitizeValue(entrySiteInput.value, 255, true);
-  const username = sanitizeValue(entryUsernameInput.value, 255, true);
-  const password = sanitizeValue(entryPasswordInput.value, 1024, false);
-  const notes = sanitizeValue(entryNotesInput.value, 4096, true);
-
-  if (!site) {
-    showToast('Website or app is required.', 'warning');
-    entrySiteInput.focus();
-    return;
-  }
-  if (!password) {
-    showToast('Password is required.', 'warning');
-    entryPasswordInput.focus();
-    return;
-  }
-
-  const payload = {
-    site,
-    username,
-    password,
-    notes
-  };
-
-  let response;
-  if (state.editingEntryId) {
-    response = await sendMessage('UPDATE_CREDENTIAL', {
-      id: state.editingEntryId,
-      updates: payload,
-      passphrase: state.passphrase
-    });
-  } else {
-    response = await sendMessage('STORE_CREDENTIAL', {
-      entry: payload,
-      passphrase: state.passphrase
-    });
-  }
-
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to save credential.', 'error');
-    return;
-  }
-
-  closeModal('entryModal');
-  showToast(state.editingEntryId ? 'Credential updated.' : 'Credential saved to vault.', 'success');
-  state.editingEntryId = null;
-  await refreshVaultEntries();
-  resetInactivityTimer();
-}
-
-async function handleUnlock(event) {
-  event.preventDefault();
-  const passphrase = sanitizeValue(vaultPassphraseInput.value, 1024, false);
-  if (!passphrase) return;
-  const timeoutMinutes = state.settings?.vaultTimeout || 15;
-  const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to unlock vault.', 'error');
-    return;
-  }
-  state.passphrase = passphrase;
-  state.vaultUnlocked = true;
-  state.vaultInitialized = true;
-  vaultPassphraseInput.value = '';
-  state.entries = response.data?.entries || [];
-  renderVaultState();
-  renderVaultEntries();
-  resetInactivityTimer();
-  showToast('Vault unlocked.', 'success');
-}
-
-async function handleCreateMaster(event) {
-  event.preventDefault();
-  const master = sanitizeValue(newMasterInput.value, 1024, false);
-  const confirm = sanitizeValue(confirmMasterInput.value, 1024, false);
-  if (!master || !confirm) {
-    showToast('Enter and confirm the master password.', 'warning');
-    return;
-  }
-  if (master !== confirm) {
-    showToast('Master passwords do not match.', 'error');
-    return;
-  }
-  const initResponse = await sendMessage('INITIALIZE_VAULT', { passphrase: master });
-  if (!initResponse?.ok) {
-    showToast(initResponse?.error || 'Unable to initialise vault.', 'error');
-    return;
-  }
-  if (initResponse.created === false) {
-    state.vaultInitialized = true;
-    renderVaultState();
-    showToast('Vault already exists. Unlock it with your master password.', 'warning');
-    return;
-  }
-  const timeoutMinutes = state.settings?.vaultTimeout || 15;
-  const unlockResponse = await sendMessage('UNLOCK_VAULT', { passphrase: master, timeoutMinutes });
-  newMasterInput.value = '';
-  confirmMasterInput.value = '';
-  if (!unlockResponse?.ok) {
-    state.vaultInitialized = true;
-    renderVaultState();
-    showToast('Vault created. Unlock with your new master password.', 'success');
-    return;
-  }
-  state.passphrase = master;
-  state.vaultInitialized = true;
-  state.vaultUnlocked = true;
-  state.entries = unlockResponse.data?.entries || [];
-  renderVaultState();
-  renderVaultEntries();
-  resetInactivityTimer();
-  showToast('Vault created and unlocked.', 'success');
-}
-
-async function loadVaultStatus() {
-  const response = await sendMessage('VAULT_STATUS');
-  if (!response?.ok) return;
-  state.vaultInitialized = response.status?.initialized ?? false;
-  if (response.status?.unlocked) {
-    // Vault is unlocked in the service worker. For security we do not restore
-    // the plaintext passphrase into the popup automatically. Sensitive actions
-    // will require the user to re-enter the master password or use biometric unlock.
-    state.vaultUnlocked = true;
-    state.passphrase = null;
-    renderVaultState();
-    await refreshVaultEntries();
-    resetInactivityTimer();
-  } else {
-    state.vaultUnlocked = false;
-    state.passphrase = null;
-    renderVaultState();
-  }
-}
-
-function syncGeneratorControls() {
-  if (!state.settings) return;
-  if (state.settings.generatorDefaults) {
-    const defs = state.settings.generatorDefaults;
-    if (lengthRange) lengthRange.value = defs.length || 16;
-    if (lengthValue) lengthValue.textContent = defs.length || 16;
-    if (includeLower) includeLower.checked = defs.lowercase !== false;
-    if (includeUpper) includeUpper.checked = defs.uppercase !== false;
-    if (includeNumbers) includeNumbers.checked = defs.numbers !== false;
-    if (includeSymbols) includeSymbols.checked = defs.symbols !== false;
-  } else {
-    if (lengthRange) lengthRange.value = state.settings.minLength;
-    if (lengthValue) lengthValue.textContent = state.settings.minLength;
-    if (includeLower) includeLower.checked = state.settings.includeLowercase;
-    if (includeUpper) includeUpper.checked = state.settings.includeUppercase;
-    if (includeNumbers) includeNumbers.checked = state.settings.includeNumbers;
-    if (includeSymbols) includeSymbols.checked = state.settings.includeSymbols;
-  }
-  if (avoidSimilar) avoidSimilar.checked = state.settings.avoidSimilar;
-  syncSettingsView();
-}
-
-async function handleGenerate() {
-  setLoading(generateButton, true);
-  generatorStatus.textContent = '';
-  const constraints = {
-    length: Number(lengthRange.value),
-    overrides: {
-      minLength: Number(lengthRange.value),
-      includeLowercase: includeLower.checked,
-      includeUppercase: includeUpper.checked,
-      includeNumbers: includeNumbers.checked,
-      includeSymbols: includeSymbols.checked,
-      avoidSimilar: avoidSimilar.checked
-    }
-  };
-  const response = await sendMessage('GENERATE_PASSWORD', { constraints });
-  setLoading(generateButton, false);
-  if (!response?.ok) {
-    generatorStatus.textContent = response?.error || 'Could not generate password.';
-    generatorStatus.classList.remove('success');
-    generatorStatus.classList.add('error');
-    return;
-  }
-  state.generatorPassword = response.password;
-  generatedResult.value = response.password;
-  updateStrength(response.password);
-  generatorStatus.textContent = 'Strong password generated.';
-  generatorStatus.classList.remove('error');
-  generatorStatus.classList.add('success');
-  showToast('New password generated.', 'success');
-}
-
-async function saveGeneratedToVault() {
-  if (!generatedResult.value) {
-    showToast('Generate a password first.', 'warning');
-    return;
-  }
-  await openEntryModal({
-    id: null,
-    site: await detectActiveOrigin(),
-    username: '',
-    password: generatedResult.value,
-    notes: ''
-  });
-}
-
-async function saveTestedToVault() {
-  if (!passwordInput.value) {
-    showToast('Enter a password first.', 'warning');
-    return;
-  }
-  await openEntryModal({
-    id: null,
-    site: await detectActiveOrigin(),
-    username: '',
-    password: passwordInput.value,
-    notes: ''
-  });
-}
-
-async function changeMasterPassword(event) {
-  event.preventDefault();
-  if (!requireUnlockedVault()) return;
-  const current = sanitizeValue(currentMasterInput.value, 1024, false);
-  const next = sanitizeValue(nextMasterInput.value, 1024, false);
-  const confirm = sanitizeValue(confirmNextMasterInput.value, 1024, false);
-  if (!current || !next || !confirm) {
-    showToast('Complete all fields.', 'warning');
-    return;
-  }
-  if (next !== confirm) {
-    showToast('New master passwords do not match.', 'error');
-    return;
-  }
-  const response = await sendMessage('CHANGE_MASTER_PASSWORD', {
-    oldPassphrase: current,
-    newPassphrase: next
-  });
-  if (!response?.ok) {
-    showToast(response?.error || 'Unable to change master password.', 'error');
-    return;
-  }
-  state.passphrase = next;
-  closeModal('masterModal');
-  resetInactivityTimer();
-  showToast('Master password updated.', 'success');
-}
-
-function attachEventListeners() {
-  passwordInput.addEventListener('input', event => {
-    updateStrength(event.target.value);
-    hibpStatus.textContent = 'Not checked yet.';
-    hibpStatus.className = 'text-muted';
-  });
-
-  togglePasswordBtn.addEventListener('click', () => {
-    const isHidden = passwordInput.type === 'password';
-    passwordInput.type = isHidden ? 'text' : 'password';
-    updatePasswordToggleIcon();
-  });
-
-  copyTestPasswordBtn.addEventListener('click', async () => {
-    if (!passwordInput.value) {
-      showToast('Enter a password first.', 'warning');
-      return;
-    }
-    const ok = await copyToClipboard(passwordInput.value);
-    showToast(ok ? 'Password copied.' : 'Clipboard unavailable.', ok ? 'success' : 'warning');
-  });
-
-  hibpButton.addEventListener('click', async () => {
-    if (!passwordInput.value) {
-      showToast('Enter a password to check.', 'warning');
-      return;
-    }
-    setLoading(hibpButton, true);
-    hibpStatus.textContent = 'Checking…';
-    hibpStatus.className = 'text-muted';
-    const response = await sendMessage('HIBP_CHECK', { password: passwordInput.value });
-    setLoading(hibpButton, false);
-    if (!response?.ok) {
-      hibpStatus.textContent = response?.error || 'Could not check breaches.';
-      hibpStatus.className = 'text-warning';
-      return;
-    }
-    if (response.result?.compromised) {
-      hibpStatus.innerHTML = `<strong class="breach-count">${response.result.count.toLocaleString()}</strong> breaches found`;
-      hibpStatus.className = 'text-default';
-      showToast(`Password found in ${response.result.count.toLocaleString()} breaches!`, 'error');
-    } else {
-      hibpStatus.textContent = 'No known breaches found.';
-      hibpStatus.className = 'text-success';
-      showToast('Password not found in breaches.', 'success');
-    }
-  });
-
-  generateButton.addEventListener('click', handleGenerate);
-
-  lengthRange.addEventListener('input', event => {
-    lengthValue.textContent = event.target.value;
-  });
-
-  const generatorToggles = [includeLower, includeUpper, includeNumbers, includeSymbols, avoidSimilar];
-  generatorToggles.forEach(inputEl => {
-    inputEl.addEventListener('change', () => {
-      if (!state.settings) return;
-      state.settings.includeLowercase = includeLower.checked;
-      state.settings.includeUppercase = includeUpper.checked;
-      state.settings.includeNumbers = includeNumbers.checked;
-      state.settings.includeSymbols = includeSymbols.checked;
-      state.settings.avoidSimilar = avoidSimilar.checked;
-      scheduleSettingsSave();
-    });
-  });
-
-  lengthRange.addEventListener('change', () => {
-    if (!state.settings) return;
-    state.settings.minLength = Number(lengthRange.value);
-    scheduleSettingsSave();
-  });
-
-  copyGeneratedBtn.addEventListener('click', async () => {
-    if (!generatedResult.value) {
-      showToast('Generate a password first.', 'warning');
-      return;
-    }
-    const ok = await copyToClipboard(generatedResult.value);
-    showToast(ok ? 'Generated password copied.' : 'Clipboard unavailable.', ok ? 'success' : 'warning');
-  });
-
-  useForTestBtn.addEventListener('click', () => {
-    if (!generatedResult.value) {
-      showToast('Generate a password first.', 'warning');
-      return;
-    }
-    passwordInput.value = generatedResult.value;
-    updateStrength(generatedResult.value);
-    setView('tester');
-    passwordInput.focus();
-  });
-
-  saveGeneratedBtn.addEventListener('click', saveGeneratedToVault);
-  if (saveTestedBtn) {
-    saveTestedBtn.addEventListener('click', saveTestedToVault);
-  }
-
-  createMasterForm.addEventListener('submit', handleCreateMaster);
-  unlockForm.addEventListener('submit', handleUnlock);
-  if (biometricUnlockBtn) {
-    biometricUnlockBtn.addEventListener('click', async () => {
-      biometricUnlockBtn.disabled = true;
-
-      try {
-        // 1. Get current biometric credential info from background
-        const statusRes = await sendMessage('BIOMETRIC_STATUS');
-        if (!statusRes?.enabled) throw new Error('Biometric unlock is not enabled.');
-
-        // 2. Start biometric session in background
-        const startRes = await sendMessage('BIOMETRIC_AUTH_START', { credentialId: null });
-        if (!startRes?.ok) throw new Error(startRes?.error || 'Failed to start biometric auth');
-
-        // 3. Trigger native dialog directly from extension popup
-        // Note: we can do this here because popup is extension origin
-        const bioDataRes = await getStorage('local', 'securepassBiometric');
-        const b = bioDataRes.securepassBiometric;
-        if (!b) throw new Error('Stored biometric data not found.');
-
-        const rpId = chrome.runtime.id;
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
-
-        const assertion = await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            rpId,
-            allowCredentials: [{ 
-              type: 'public-key', 
-              id: base64ToBuffer(b.credentialId),
-              transports: ['internal']
-            }],
-            userVerification: 'required',
-            extensions: {
-              prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
-            },
-          },
-        });
-
-        const prfResults = assertion.getClientExtensionResults()?.prf?.results;
-        const prfOutput  = prfResults?.first ? bufferToBase64(prfResults.first) : null;
-
-        // 4. Send PRF results to background to complete unlock
-        const completeRes = await sendMessage('BIOMETRIC_AUTH_COMPLETE', {
-          sessionId: startRes.sessionId,
-          prfOutput,
-          prfAvailable: !!prfOutput
-        });
-
-        if (completeRes?.ok) {
-          showToast('Vault unlocked!', 'success');
-          await loadVaultStatus();
-        } else if (completeRes?.error?.includes('Enter your master password')) {
-          const passphrase = await promptForMasterPassword('Biometric verification succeeded. Enter your master password to unlock the vault.');
-          if (!passphrase) {
-            showToast('Master password is required to finish unlock.', 'warning');
-            return;
-          }
-
-          const timeoutMinutes = state.settings?.vaultTimeout || 15;
-          const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
-          if (!unlockRes?.ok) {
-            throw new Error(unlockRes?.error || 'Unable to unlock vault.');
-          }
-
-          state.passphrase = passphrase;
-          state.vaultUnlocked = true;
-          state.vaultInitialized = true;
-          state.entries = unlockRes.data?.entries || [];
-          renderVaultState();
-          renderVaultEntries();
-          resetInactivityTimer();
-          showToast('Vault unlocked with biometric verification + master password.', 'success');
-        } else {
-          throw new Error(completeRes?.error || 'Authentication failed');
-        }
-      } catch (err) {
-        logger.error('Biometric Unlock Error:', err?.message || String(err));
-        if (err.name !== 'NotAllowedError') {
-          showToast(err.message || 'Biometric authentication failed.', 'error');
-        }
-      } finally {
-        biometricUnlockBtn.disabled = false;
-      }
-    });
-  }
-  entryForm.addEventListener('submit', handleEntrySubmit);
-  masterForm.addEventListener('submit', changeMasterPassword);
-  if (unlockSetupForm) {
-    unlockSetupForm.addEventListener('submit', event => {
-      event.preventDefault();
-      const passphrase = (unlockSetupPassword?.value || '').trim();
-      if (!passphrase) {
-        showToast('Master password is required.', 'warning');
-        return;
-      }
-
-      const resolver = unlockSetupResolver;
-      unlockSetupResolver = null;
-      if (!unlockSetupModal.classList.contains('hidden')) {
-        unlockSetupModal.classList.add('hidden');
-      }
-      if (entryModal.classList.contains('hidden') && masterModal.classList.contains('hidden') && unlockSetupModal.classList.contains('hidden')) {
-        modalBackdrop.classList.add('hidden');
-      }
-
-      if (resolver) resolver(passphrase);
-    });
-  }
+function attachGlobalListeners() {
+  viewTabs.forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
 
   modalBackdrop.addEventListener('click', () => {
     closeModal('entryModal');
@@ -1347,28 +227,37 @@ function attachEventListeners() {
   });
 
   document.querySelectorAll('[data-close]')?.forEach(button => {
-    button.addEventListener('click', event => {
-      const target = event.currentTarget.getAttribute('data-close');
-      closeModal(target);
-    });
+    button.addEventListener('click', event => closeModal(event.currentTarget.getAttribute('data-close')));
   });
 
   document.querySelectorAll('.modal-header .icon-button').forEach(button => {
     button.addEventListener('click', event => {
       const modal = event.target.closest('.modal');
-      if (modal) {
-        closeModal(modal.id);
-      }
+      if (modal) closeModal(modal.id);
     });
   });
 
   document.querySelectorAll('[data-toggle-target]')?.forEach(button => {
-    const expanded = button.getAttribute('aria-expanded') === 'true';
-    updateToggleLabel(button, expanded);
     button.addEventListener('click', event => {
-      delete event.currentTarget.dataset.autoOpened;
-      toggleCollapsible(event.currentTarget);
+      const targetId = event.currentTarget.getAttribute('data-toggle-target');
+      const target = document.getElementById(targetId);
+      if (target) {
+        const isExpanded = event.currentTarget.getAttribute('aria-expanded') === 'true';
+        event.currentTarget.setAttribute('aria-expanded', String(!isExpanded));
+        target.hidden = isExpanded;
+      }
     });
+  });
+
+  openSettingsBtn.addEventListener('click', openSettingsPanel);
+  closeSettingsBtn.addEventListener('click', closeSettingsPanel);
+  settingsPanel.addEventListener('click', event => {
+    if (event.target === settingsPanel) closeSettingsPanel();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && settingsPanel.getAttribute('aria-hidden') === 'false') {
+      closeSettingsPanel();
+    }
   });
 
   addEntryBtn.addEventListener('click', () => openEntryModal());
@@ -1377,7 +266,7 @@ function attachEventListeners() {
 
   vaultSearch.addEventListener('input', event => {
     state.filter = event.target.value;
-    renderVaultEntries();
+    renderEntries();
     resetInactivityTimer();
   });
 
@@ -1387,623 +276,97 @@ function attachEventListeners() {
       searchContainer.classList.remove('active');
       vaultSearch.value = '';
       state.filter = '';
-      renderVaultEntries();
+      renderEntries();
     } else {
       searchContainer.classList.add('active');
       setTimeout(() => vaultSearch.focus(), 300);
     }
   });
 
-  viewTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      setView(tab.dataset.view);
-    });
-  });
-
-  /*
-  themeToggle.addEventListener('click', async () => {
-    if (!state.settings) return;
-    const currentIndex = THEMES.indexOf(state.settings.theme || 'system');
-    const nextTheme = THEMES[(currentIndex + 1) % THEMES.length];
-    state.settings.theme = nextTheme;
-    applyTheme(nextTheme);
-    await saveSettings(state.settings);
-  });
-  */
-
-  openSettingsBtn.addEventListener('click', () => openSettingsPanel());
-  closeSettingsBtn.addEventListener('click', () => closeSettingsPanel());
-  settingsPanel.addEventListener('click', event => {
-    if (event.target === settingsPanel) {
-      closeSettingsPanel();
-    }
-  });
-
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && settingsPanel.getAttribute('aria-hidden') === 'false') {
-      closeSettingsPanel();
-    }
-  });
-
-  themeRadios.forEach(radio => {
-    radio.addEventListener('change', async event => {
-      if (!event.target.checked || !state.settings) return;
-      state.settings.theme = event.target.value;
-      applyTheme(event.target.value);
-      await saveSettings(state.settings);
-      syncSettingsView();
-    });
-  });
-
-  autoLockRange.addEventListener('input', event => {
-    autoLockLabel.textContent = `${event.target.value} min`;
-  });
-
-  autoLockRange.addEventListener('change', () => {
-    if (!state.settings) return;
-    state.settings.vaultTimeout = Number(autoLockRange.value);
-    scheduleSettingsSave();
-  });
-
-  async function resolveSyncConflict(targetUseSync) {
-    if (targetUseSync) {
-      const choice = window.prompt(
-        'Conflict detected: Local and Sync vaults are different.\n\n' +
-        'Type 1 to keep Local (overwrite Sync).\n' +
-        'Type 2 to use Sync (keep Sync as source).\n' +
-        'Type 3 to cancel and merge manually via Export/Import.',
-        '3'
-      );
-
-      const normalized = (choice || '').trim();
-      if (normalized === '1') return 'keep-local';
-      if (normalized === '2') return 'use-sync';
-      return null;
-    }
-
-    const useSyncAsSource = window.confirm(
-      'Both Local and Chrome Sync vaults exist and they are different.\n\n' +
-      'Press OK to use Sync as source and overwrite Local.\n' +
-      'Press Cancel to keep Local and disable Sync without overwriting Local.'
-    );
-    return useSyncAsSource ? 'use-sync' : 'keep-local';
-  }
-
-  async function applySyncModeSafely(targetUseSync) {
-    let response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync });
-    if (!response?.ok) {
-      throw new Error(response?.error || 'Unable to change sync mode.');
-    }
-
-    if (response.requiresResolution) {
-      const strategy = await resolveSyncConflict(targetUseSync);
-      if (!strategy) {
-        throw new Error('Sync switch cancelled. You can merge manually via Export/Import first.');
-      }
-      response = await sendMessage('SET_SYNC_MODE_SAFE', { targetUseSync, strategy });
-      if (!response?.ok) {
-        throw new Error(response?.error || 'Unable to resolve sync conflict.');
-      }
-    }
-
-    return response;
-  }
-
-  syncToggle.addEventListener('change', async () => {
-    if (!state.settings) return;
-    const previous = Boolean(state.settings.useSync);
-    const targetUseSync = Boolean(syncToggle.checked);
-    if (targetUseSync === previous) return;
-
-    syncToggle.disabled = true;
-    try {
-      const res = await applySyncModeSafely(targetUseSync);
-      if (!res?.settings) {
-        throw new Error('Sync mode changed, but updated settings were not returned.');
-      }
-
-      state.settings = { ...state.settings, ...res.settings };
-      syncToggle.checked = Boolean(state.settings.useSync);
-      showToast(
-        state.settings.useSync
-          ? 'Chrome Sync enabled safely.'
-          : 'Local storage enabled safely.',
-        'success'
-      );
-    } catch (error) {
-      syncToggle.checked = previous;
-      state.settings.useSync = previous;
-      showToast(error.message || 'Unable to change sync mode.', 'error');
-    } finally {
-      syncToggle.disabled = false;
-    }
-  });
-
-  // New Settings Listeners
-  if (clipboardRange) {
-    clipboardRange.addEventListener('input', () => {
-      const val = Number(clipboardRange.value);
-      clipboardLabel.textContent = val === 0 ? 'Never' : `${val}s`;
-      state.settings.clipboardTimeout = val;
-      scheduleSettingsSave();
-    });
-  }
-
-  if (hibpCacheRange) {
-    hibpCacheRange.addEventListener('input', () => {
-      const val = Number(hibpCacheRange.value);
-      hibpCacheLabel.textContent = val === 1 ? '1 hour' : `${val} hours`;
-      state.settings.hibpCacheTtlHours = val;
-      scheduleSettingsSave();
-    });
-  }
-
-  if (defaultLengthRange) {
-    defaultLengthRange.addEventListener('input', () => {
-      const val = Number(defaultLengthRange.value);
-      defaultLengthLabel.textContent = val;
-      if (!state.settings.generatorDefaults) state.settings.generatorDefaults = {};
-      state.settings.generatorDefaults.length = val;
-      scheduleSettingsSave();
-    });
-  }
-
-  [defaultUpper, defaultLower, defaultNumbers, defaultSymbols].forEach(cb => {
-    if (cb) {
-      cb.addEventListener('change', () => {
-        if (!state.settings.generatorDefaults) state.settings.generatorDefaults = {};
-        state.settings.generatorDefaults.uppercase = defaultUpper.checked;
-        state.settings.generatorDefaults.lowercase = defaultLower.checked;
-        state.settings.generatorDefaults.numbers = defaultNumbers.checked;
-        state.settings.generatorDefaults.symbols = defaultSymbols.checked;
-        scheduleSettingsSave();
-      });
-    }
-  });
-
-  // Change Master Key (from Settings page)
-  const changeMasterKeyBtn = document.getElementById('changeMasterKeyBtn');
-  if (changeMasterKeyBtn) {
-    changeMasterKeyBtn.addEventListener('click', () => {
-      openModal('masterModal');
-    });
-  }
-
-  // Biometric Unlock Setup / Disable
-  const biometricSetupBtn = document.getElementById('biometricSetupBtn');
-  const biometricBtnLabel = document.getElementById('biometricBtnLabel');
-  const biometricBtnSub   = document.getElementById('biometricBtnSub');
-
-  function collapseBiometricInlineAuth(reset = false) {
-    if (!biometricSetupBtn || !biometricInlineAuth) return;
-    biometricSetupBtn.classList.remove('inline-auth-open');
-    biometricSetupBtn.setAttribute('aria-expanded', 'false');
-    biometricInlineAuth.setAttribute('aria-hidden', 'true');
-    if (reset && biometricInlinePassword) {
-      biometricInlinePassword.value = '';
-    }
-  }
-
-  function expandBiometricInlineAuth() {
-    if (!biometricSetupBtn || !biometricInlineAuth) return;
-    biometricSetupBtn.classList.add('inline-auth-open');
-    biometricSetupBtn.setAttribute('aria-expanded', 'true');
-    biometricInlineAuth.setAttribute('aria-hidden', 'false');
-    biometricBtnLabel.textContent = 'Insert master password';
-    biometricBtnSub.textContent = 'Unlock here to continue biometric setup';
-    setTimeout(() => biometricInlinePassword?.focus(), 80);
-  }
-
-  async function performBiometricSetup() {
-    showToast('Confirm your identity with Windows Hello / Touch ID / device PIN.', 'info');
-    const rpId = chrome.runtime.id;
-    const registerChallenge = crypto.getRandomValues(new Uint8Array(32));
-
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge: registerChallenge,
-        rp: { id: rpId, name: 'SecurePass' },
-        user: {
-          id: new TextEncoder().encode('securepass-user'),
-          name: 'SecurePass User',
-          displayName: 'SecurePass',
-        },
-        pubKeyCredParams: [
-          { type: 'public-key', alg: -7 },
-          { type: 'public-key', alg: -257 },
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'required',
-        },
-        extensions: {
-          prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
-        },
-      },
-    });
-
-    // PRF output is only reliably available during assertion (get), not registration (create).
-    // Run a follow-up assertion immediately after registration to determine actual PRF availability.
-    const assertionChallenge = crypto.getRandomValues(new Uint8Array(32));
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge: assertionChallenge,
-        rpId,
-        allowCredentials: [{
-          type: 'public-key',
-          id: credential.rawId,
-          transports: ['internal'],
-        }],
-        userVerification: 'required',
-        extensions: {
-          prf: { eval: { first: new TextEncoder().encode('securepass-master-key-v1') } },
-        },
-      },
-    });
-
-    const prfResults = assertion.getClientExtensionResults()?.prf?.results;
-    const prfOutput = prfResults?.first ? bufferToBase64(prfResults.first) : null;
-
-    const res = await sendMessage('BIOMETRIC_REGISTER_COMPLETE', {
-      credentialId: bufferToBase64(credential.rawId),
-      prfOutput,
-      prfAvailable: !!prfOutput,
-      passphrase: state.passphrase,
-      trustedDeviceRequested: Boolean(state.settings?.trustedDeviceMode),
-    });
-
-    if (res?.ok) {
-      collapseBiometricInlineAuth(true);
-      if (res.mode === 'prf-unlock') {
-        showToast('Biometric unlock enabled with PRF (passwordless).', 'success');
-      } else if (res.mode === 'trusted-device') {
-        showToast('Trusted Device enabled: biometric-only unlock on this device.', 'warning');
-      } else {
-        showToast('Biometric verification enabled. Master password is still required to unlock.', 'info');
-      }
-      await refreshBiometricBtn();
-      return;
-    }
-
-    throw new Error(res?.error || 'Failed to configure biometric unlock.');
-  }
-
-  async function refreshBiometricBtn() {
-    if (!biometricSetupBtn) return;
-    biometricSetupBtn.style.display = '';
-    collapseBiometricInlineAuth(true);
-    
-    // Get status even if locked
-    const res = await sendMessage('BIOMETRIC_STATUS');
-    
-    if (!state.vaultUnlocked) {
-      biometricBtnLabel.textContent = res?.enabled ? 'Disable Biometric Unlock' : 'Set up Biometric Unlock';
-      biometricBtnSub.textContent   = res?.enabled
-        ? 'Biometric unlock is active. Tap to disable.'
-        : 'Tap to unlock and configure here';
-      biometricSetupBtn.classList.remove('danger');
-      return;
-    }
-
-    if (res?.enabled) {
-      biometricBtnLabel.textContent = 'Disable Biometric Unlock';
-      biometricBtnSub.textContent = res.mode === 'prf-unlock'
-        ? 'Active · PRF-backed unlock enabled'
-        : res.mode === 'trusted-device'
-          ? 'Active · Trusted Device mode (higher local risk)'
-          : 'Active · Verify-only mode (master password once per session)';
-      biometricSetupBtn.classList.add('danger');
-    } else {
-      biometricBtnLabel.textContent = 'Set up Biometric Unlock';
-      biometricBtnSub.textContent = state.settings?.trustedDeviceMode
-        ? 'Will use Trusted Device fallback when PRF is unavailable'
-        : 'Use fingerprint, Face ID or device PIN';
-      biometricSetupBtn.classList.remove('danger');
-    }
-  }
-
-  if (trustedDeviceToggle) {
-    trustedDeviceToggle.addEventListener('change', async () => {
-      if (!state.settings) return;
-      const next = Boolean(trustedDeviceToggle.checked);
-
-      if (next) {
-        const confirmed = window.confirm(
-          'Trusted Device Mode stores a local unlock secret so biometric unlock works after restart on non-PRF devices.\n\n' +
-          'Security warning: this is less secure than PRF mode.\n\n' +
-          'Enable Trusted Device Mode?'
-        );
-        if (!confirmed) {
-          trustedDeviceToggle.checked = false;
-          return;
-        }
-      }
-
-      state.settings.trustedDeviceMode = next;
-      await saveSettings(state.settings);
-
-      const bio = await sendMessage('BIOMETRIC_STATUS');
-      if (bio?.enabled) {
-        showToast('Trusted Device preference saved. Re-run biometric setup to apply mode change.', 'info');
-      } else {
-        showToast(next ? 'Trusted Device mode enabled.' : 'Trusted Device mode disabled.', 'success');
-      }
-
-      await refreshBiometricBtn();
-    });
-  }
-
-  if (biometricSetupBtn) {
-    biometricSetupBtn.addEventListener('click', async (event) => {
-      if (biometricInlineAuth?.contains(event.target)) return;
-      const statusRes = await sendMessage('BIOMETRIC_STATUS');
-      if (statusRes?.enabled) {
-        // Disable
-        if (!confirm('Disable biometric unlock? You will need to enter your master password each time.')) return;
-        const disableRes = await sendMessage('DISABLE_BIOMETRIC');
-        if (disableRes?.ok) {
-          showToast('Biometric unlock disabled.', 'success');
-          await refreshBiometricBtn();
-        } else {
-          showToast('Could not disable biometrics.', 'error');
-        }
-      } else {
-        try {
-          if (!state.passphrase) {
-            expandBiometricInlineAuth();
-            return;
-          }
-          await performBiometricSetup();
-        } catch (err) {
-          if (err.name === 'NotAllowedError') {
-            showToast('Biometric setup cancelled.', 'info');
-          } else {
-            showToast('Error: ' + err.message, 'error');
-          }
-        }
-      }
-    });
-
-    biometricSetupBtn.addEventListener('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (biometricInlineAuth?.contains(event.target)) return;
+  const entryForm = document.getElementById('entryForm');
+  if (entryForm) entryForm.addEventListener('submit', handleEntrySubmit);
+  const unlockForm = document.getElementById('unlockForm');
+  if (unlockForm) unlockForm.addEventListener('submit', handleUnlock);
+  const createMasterForm = document.getElementById('createMasterForm');
+  if (createMasterForm) createMasterForm.addEventListener('submit', handleCreateMaster);
+  const masterForm = document.getElementById('masterForm');
+  if (masterForm) masterForm.addEventListener('submit', changeMasterPassword);
+  if (unlockSetupForm) {
+    unlockSetupForm.addEventListener('submit', event => {
       event.preventDefault();
-      biometricSetupBtn.click();
-    });
-
-    biometricInlineAuth?.addEventListener('click', event => {
-      event.stopPropagation();
-    });
-    biometricInlinePassword?.addEventListener('keydown', async event => {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      biometricInlineConfirm?.click();
-    });
-    biometricInlineCancel?.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      collapseBiometricInlineAuth(true);
-      refreshBiometricBtn();
-    });
-    biometricInlineConfirm?.addEventListener('click', async event => {
-      event.preventDefault();
-      event.stopPropagation();
-      const passphrase = sanitizeValue(biometricInlinePassword?.value || '', 1024, false);
+      const passphrase = (unlockSetupPassword?.value || '').trim();
       if (!passphrase) {
         showToast('Master password is required.', 'warning');
-        biometricInlinePassword?.focus();
         return;
       }
-
-      const timeoutMinutes = state.settings?.vaultTimeout || 15;
-      const unlockRes = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
-      if (!unlockRes?.ok) {
-        showToast(unlockRes?.error || 'Unable to unlock vault.', 'error');
-        return;
-      }
-
-      state.passphrase = passphrase;
-      state.vaultUnlocked = true;
-      state.vaultInitialized = true;
-      state.entries = unlockRes.data?.entries || [];
-      renderVaultState();
-      renderVaultEntries();
-      resetInactivityTimer();
-
-      try {
-        await performBiometricSetup();
-      } catch (err) {
-        if (err.name === 'NotAllowedError') {
-          showToast('Biometric setup cancelled.', 'info');
-        } else {
-          showToast('Error: ' + err.message, 'error');
-        }
-      }
-    });
-  }
-
-  // Refresh biometric button state when settings panel opens
-  const origOpenSettings = openSettingsPanel;
-  // Wrap openSettingsPanel to also refresh biometric state
-  openSettingsBtn?.addEventListener('click', () => refreshBiometricBtn());
-
-  // Reset Settings
-  const resetSettingsBtn = document.getElementById('resetSettings');
-
-  if (resetSettingsBtn) {
-    resetSettingsBtn.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to reset all settings to default? This cannot be undone.')) return;
-
-      // Reset to defaults
-      const defaults = {
-        theme: 'system',
-        minLength: 16,
-        includeUppercase: true,
-        includeLowercase: true,
-        includeNumbers: true,
-        includeSymbols: true,
-        avoidSimilar: true,
-        vaultTimeout: 15,
-        hibpCacheTtlHours: 24,
-        trustedDeviceMode: false,
-        useSync: false,
-        clipboardTimeout: 30,
-        generatorDefaults: {
-          length: 16,
-          uppercase: true,
-          lowercase: true,
-          numbers: true,
-          symbols: true
-        }
-      };
-
-      try {
-        const previous = Boolean(state.settings?.useSync);
-        const targetUseSync = Boolean(defaults.useSync);
-        if (targetUseSync !== previous) {
-          await applySyncModeSafely(targetUseSync);
-        }
-
-        state.settings = defaults;
-        await saveSettings(state.settings);
-        applyTheme(state.settings.theme);
-        syncSettingsView();
-        showToast('Settings reset to defaults.', 'success');
-      } catch (error) {
-        showToast(error.message || 'Unable to reset settings safely.', 'error');
-      }
-    });
-  }
-
-  if (exportVaultBtn) {
-    exportVaultBtn.addEventListener('click', async () => {
-      if (!(await ensureVaultAccessible('Unlock the vault to export your backup.'))) return;
-      const backupPassword = await promptForMasterPassword('Set a backup password. You will need it to import this backup later.');
-      if (!backupPassword || !backupPassword.trim()) {
-        showToast('Backup export cancelled.', 'warning');
-        return;
-      }
-
-      const response = await sendMessage('EXPORT_VAULT', {
-        format: 'encrypted',
-        backupPassword: backupPassword.trim()
-      });
-      if (!response?.ok) {
-        showToast(response?.error || 'Failed to export vault.', 'error');
-        return;
-      }
-
-      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `securepass-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Vault exported successfully.', 'success');
-    });
-  }
-
-  if (importVaultBtn) {
-    importVaultBtn.addEventListener('click', async () => {
-      if (!(await ensureVaultAccessible('Unlock the vault to import a backup.'))) return;
-      importVaultFile.click();
-    });
-  }
-
-  if (importVaultFile) {
-    importVaultFile.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const entries = JSON.parse(event.target.result);
-          if (!(await ensureVaultAccessible('Unlock the vault to import this backup.'))) {
-            importVaultFile.value = '';
-            return;
-          }
-
-          let backupPassword = '';
-          if (entries?.kind === 'securepass-encrypted-backup') {
-            backupPassword = await promptForMasterPassword('Enter the backup password used to encrypt this backup file.');
-            if (!backupPassword || !backupPassword.trim()) {
-              showToast('Import cancelled.', 'warning');
-              importVaultFile.value = '';
-              return;
-            }
-          }
-
-          const response = await sendMessage('IMPORT_VAULT', {
-            data: entries,
-            backupPassword: backupPassword ? backupPassword.trim() : ''
-          });
-          if (!response?.ok) {
-            showToast(response?.error || 'Import failed.', 'error');
-            importVaultFile.value = '';
-            return;
-          }
-
-          showToast(`Imported ${response.count} entries.`, 'success');
-          await refreshVaultEntries();
-        } catch (err) {
-          showToast('Invalid JSON file.', 'error');
-        }
-        importVaultFile.value = '';
-      };
-      reader.readAsText(file);
-    });
-  }
-
-  if (clearVaultBtn) {
-    clearVaultBtn.addEventListener('click', async () => {
-      if (!(await ensureVaultAccessible('Unlock the vault to clear its contents.'))) return;
-      const confirmed = window.confirm('DANGER: This will permanently delete ALL entries in your vault. This action cannot be undone.\n\nAre you sure?');
-      if (confirmed) {
-        const response = await sendMessage('CLEAR_VAULT_ENTRIES');
-        if (!response?.ok) {
-          showToast(response?.error || 'Unable to clear vault.', 'error');
-          return;
-        }
-        showToast('Vault cleared.', 'success');
-        await refreshVaultEntries();
+      resolveUnlockSetup(passphrase);
+      if (!unlockSetupModal.classList.contains('hidden')) unlockSetupModal.classList.add('hidden');
+      if (entryModal.classList.contains('hidden') && masterModal.classList.contains('hidden')) {
+        modalBackdrop.classList.add('hidden');
       }
     });
   }
 }
 
+async function loadVaultStatus() {
+  const response = await sendMessage('VAULT_STATUS');
+  if (!response?.ok) return;
+  state.vaultInitialized = response.status?.initialized ?? false;
+  if (response.status?.unlocked) {
+    state.vaultUnlocked = true;
+    state.passphrase = null;
+    renderVaultState();
+    const listRes = await sendMessage('LIST_CREDENTIALS');
+    if (listRes?.ok && listRes.unlocked) {
+      state.entries = listRes.entries || [];
+      renderEntries();
+    } else {
+      await lockVault();
+    }
+    resetInactivityTimer();
+  } else {
+    state.vaultUnlocked = false;
+    state.passphrase = null;
+    renderVaultState();
+  }
+}
+
 async function initialise() {
   state.settings = await loadSettings();
-  if (!state.settings.theme) {
-    state.settings.theme = 'system';
-  }
+  if (!state.settings.theme) state.settings.theme = 'system';
   applyTheme(state.settings.theme);
-  if (state.settings.theme === 'system' && window.matchMedia) {
-    window
-      .matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => applyTheme(state.settings.theme));
-  }
+
+  attachGeneratorListeners();
+  attachTesterListeners();
+  attachSettingsListeners();
+  attachGlobalListeners();
+
   syncGeneratorControls();
-  updateStrength('');
-  updatePasswordToggleIcon();
-  copyTestPasswordBtn.innerHTML = ICONS.copy;
-  copyTestPasswordBtn.setAttribute('aria-label', 'Copy password');
-  copyGeneratedBtn.innerHTML = ICONS.copy;
-  copyGeneratedBtn.setAttribute('aria-label', 'Copy generated password');
-  useForTestBtn.innerHTML = ICONS.arrowRight;
-  useForTestBtn.setAttribute('aria-label', 'Send to tester');
-  lockVaultBtn.innerHTML = ICONS.lock;
-  lockVaultBtn.setAttribute('aria-label', 'Lock vault');
-  attachEventListeners();
-  setupPasswordToggles();
+  
+  const copyTestPasswordBtn = document.getElementById('copyTestPassword');
+  const copyGeneratedBtn = document.getElementById('copyGenerated');
+  const useForTestBtn = document.getElementById('useForTest');
+  if (copyTestPasswordBtn) {
+    copyTestPasswordBtn.innerHTML = ICONS.copy;
+    copyTestPasswordBtn.setAttribute('aria-label', 'Copy password');
+  }
+  if (copyGeneratedBtn) {
+    copyGeneratedBtn.innerHTML = ICONS.copy;
+    copyGeneratedBtn.setAttribute('aria-label', 'Copy generated password');
+  }
+  if (useForTestBtn) {
+    useForTestBtn.innerHTML = ICONS.arrowRight;
+    useForTestBtn.setAttribute('aria-label', 'Send to tester');
+  }
+  if (lockVaultBtn) {
+    lockVaultBtn.innerHTML = ICONS.lock;
+    lockVaultBtn.setAttribute('aria-label', 'Lock vault');
+  }
+
   await loadVaultStatus();
   setView('tester');
 
-  // Listen for settings changes from Options page
-  const removeListener = onStorageChanged((changes, area) => {
+  onStorageChanged((changes, area) => {
     if (area === 'sync' || area === 'local') {
       loadSettings().then(settings => {
         state.settings = settings;

@@ -1,4 +1,4 @@
-import { VAULT_KEY, CHUNK_SIZE, SECUREPASS_DB_NAME } from '../constants.js';
+import { VAULT_KEY, CHUNK_SIZE, SECUREPASS_DB_NAME, DB_VERSION, DB_STORE_NAME } from '../constants.js';
 
 function handleRuntimeError(reject) {
   const err = chrome.runtime?.lastError;
@@ -78,10 +78,12 @@ export function deleteIndexedDb(name) {
 export function getDB() {
   return new Promise((resolve, reject) => {
     try {
-      const request = indexedDB.open(SECUREPASS_DB_NAME, 1);
+      const request = indexedDB.open(SECUREPASS_DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains('vault')) db.createObjectStore('vault');
+        if (!db.objectStoreNames.contains(DB_STORE_NAME)) {
+          db.createObjectStore(DB_STORE_NAME);
+        }
       };
       request.onsuccess = (e) => resolve(e.target.result);
       request.onerror = () => reject(request.error);
@@ -95,13 +97,13 @@ export async function readLocalVaultRecordRaw() {
   try {
     const db = await getDB();
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction('vault', 'readonly');
+      const tx = db.transaction(DB_STORE_NAME, 'readonly');
       tx.oncomplete = () => db.close();
       tx.onerror = () => {
         db.close();
         reject(tx.error);
       };
-      const store = tx.objectStore('vault');
+      const store = tx.objectStore(DB_STORE_NAME);
       const request = store.get(VAULT_KEY);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
@@ -114,13 +116,13 @@ export async function readLocalVaultRecordRaw() {
 export async function writeLocalVaultRecordRaw(record) {
   const db = await getDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('vault', 'readwrite');
+    const tx = db.transaction(DB_STORE_NAME, 'readwrite');
     tx.oncomplete = () => db.close();
     tx.onerror = () => {
       db.close();
       reject(tx.error);
     };
-    const store = tx.objectStore('vault');
+    const store = tx.objectStore(DB_STORE_NAME);
     const request = store.put(record, VAULT_KEY);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);

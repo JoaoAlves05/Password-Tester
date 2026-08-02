@@ -12,3 +12,6 @@
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Agent context
+.agents/
