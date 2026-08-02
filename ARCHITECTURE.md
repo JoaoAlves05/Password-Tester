@@ -27,21 +27,22 @@ SecurePass/
 │   │   └── utilHandlers.js
 │   ├── cryptoVault.js         # Encryption/Decryption logic (AES-GCM)
 │   ├── encoding.js            # Safe Base64 <-> ArrayBuffer conversions
-│   ├── storage.js             # IndexedDB & Chrome Storage wrappers
 │   ├── hibp.js                # Have I Been Pwned API integration & caching
 │   ├── constants.js           # Global constants (DB names, alarms)
 │   ├── passwordGenerator.js   # Logic for generating passwords
-│   └── passwordStrength.js    # Logic for evaluating password strength
+│   ├── passwordStrength.js    # Logic for evaluating password strength
+│   └── utils/
+│       └── storage.js         # IndexedDB & Chrome Storage wrappers
 ├── popup/
 │   ├── popup.html             # Main popup UI
-│   ├── popup.js               # Bootstrap script for the popup
+│   ├── popup.js               # Bootstrap script & WebAuthn registration logic
 │   └── modules/               # UI modules (vault, generator, tester, etc.)
 ├── content/
 │   ├── content.js             # Bootstrap script injected into pages
 │   └── modules/               # Dynamically imported modules (ui, autofill, biometric)
 ├── auth/
 │   ├── auth.html              # Iframe for WebAuthn context
-│   └── auth.js                # WebAuthn registration/assertion logic
+│   └── auth.js                # WebAuthn assertion (authentication) logic
 └── manifest.json              # Extension manifest (MV3)
 ```
 
@@ -71,8 +72,8 @@ The service worker looks up the message type in its `Map` and delegates the work
 
 ### 4. Biometric Authentication (WebAuthn PRF)
 SecurePass uses the WebAuthn PRF (Pseudo-Random Function) extension to derive an encryption key from your biometrics (like Touch ID or Windows Hello).
-- **The Challenge**: Content scripts and Service Workers cannot reliably invoke `navigator.credentials.create()`.
-- **The Solution**: The extension injects a hidden iframe (`auth/auth.html`) hosted on the extension's origin. The iframe securely handles the WebAuthn prompts and communicates the PRF output back to the service worker to unlock the vault.
+- **The Challenge**: Content scripts and Service Workers cannot reliably invoke WebAuthn on the extension's origin.
+- **The Solution**: Registration (`navigator.credentials.create`) is performed directly in the trusted context of the extension popup (`popup/popup.js`). For authentication during autofill, the extension injects a hidden iframe (`auth/auth.html`) hosted on the extension's origin. The iframe securely handles the WebAuthn assertion and communicates the PRF output back to the service worker to unlock the vault.
 
 ### 5. HIBP (Have I Been Pwned)
 - When evaluating a password, the extension hashes it using SHA-1.

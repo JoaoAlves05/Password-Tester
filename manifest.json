@@ -38,7 +38,7 @@
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options/options.html",
+
   "web_accessible_resources": [
     {
       "resources": [
@@ -47,7 +47,7 @@
         "src/passwordStrength.js",
         "src/utils/storage.js",
         "popup/popup.css",
-        "options/options.css",
+
         "auth/auth.html",
         "auth/auth.js",
         "content/modules/*"

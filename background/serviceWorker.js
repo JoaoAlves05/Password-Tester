@@ -251,3 +251,12 @@ chrome.idle.onStateChanged.addListener((newState) => {
     lockVault();
   }
 });
+
+// ─── Window closed auto-lock ───────────────────────────────────────────────────
+
+chrome.windows.onRemoved.addListener(async () => {
+  const windows = await chrome.windows.getAll();
+  if (windows.length === 0) {
+    lockVault(true);
+  }
+});

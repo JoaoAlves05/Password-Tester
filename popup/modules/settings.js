@@ -44,7 +44,11 @@ export function syncSettingsView() {
   if (autoLockLabel) autoLockLabel.textContent = `${timeout} min`;
   
   if (syncToggle) syncToggle.checked = Boolean(state.settings.useSync);
-  if (trustedDeviceToggle) trustedDeviceToggle.checked = Boolean(state.settings.trustedDeviceMode);
+  if (trustedDeviceToggle) {
+    trustedDeviceToggle.checked = Boolean(state.settings.trustedDeviceMode);
+    const warning = document.getElementById('trustedDeviceWarning');
+    if (warning) warning.classList.toggle('hidden', !trustedDeviceToggle.checked);
+  }
 
   const clipboardTimeout = state.settings.clipboardTimeout ?? 30;
   if (clipboardRange) clipboardRange.value = clipboardTimeout;
@@ -153,6 +157,16 @@ export function attachSettingsListeners() {
       } finally {
         syncToggle.disabled = false;
       }
+    });
+  }
+
+  if (trustedDeviceToggle) {
+    trustedDeviceToggle.addEventListener('change', () => {
+      if (!state.settings) return;
+      state.settings.trustedDeviceMode = Boolean(trustedDeviceToggle.checked);
+      scheduleSettingsSave();
+      const warning = document.getElementById('trustedDeviceWarning');
+      if (warning) warning.classList.toggle('hidden', !trustedDeviceToggle.checked);
     });
   }
 
