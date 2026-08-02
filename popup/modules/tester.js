@@ -2,6 +2,7 @@ import { evaluatePassword } from '../../src/passwordStrength.js';
 import { sendMessage } from './messaging.js';
 import { showToast } from './toast.js';
 import { detectActiveOrigin, openEntryModal } from '../popup.js';
+import { copyToClipboard } from '../../src/utils/clipboard.js';
 
 const passwordInput = document.getElementById('passwordInput');
 const strengthBar = document.getElementById('strengthBar');
@@ -126,10 +127,10 @@ export function attachTesterListeners() {
         showToast('Enter a password first.', 'warning');
         return;
       }
-      try {
-        await navigator.clipboard.writeText(passwordInput.value);
+      const ok = await copyToClipboard(passwordInput.value);
+      if (ok) {
         showToast('Password copied.', 'success');
-      } catch (e) {
+      } else {
         showToast('Clipboard unavailable.', 'warning');
       }
     });

@@ -3,6 +3,7 @@ import { showToast } from './toast.js';
 import { updateStrength } from './tester.js';
 import { scheduleSettingsSave, syncSettingsView } from './settings.js';
 import { state, setView, detectActiveOrigin, openEntryModal } from '../popup.js';
+import { copyToClipboard } from '../../src/utils/clipboard.js';
 
 const lengthRange = document.getElementById('lengthRange');
 const lengthValue = document.getElementById('lengthValue');
@@ -135,10 +136,10 @@ export function attachGeneratorListeners() {
         showToast('Generate a password first.', 'warning');
         return;
       }
-      try {
-        await navigator.clipboard.writeText(generatedResult.value);
+      const ok = await copyToClipboard(generatedResult.value);
+      if (ok) {
         showToast('Generated password copied.', 'success');
-      } catch (e) {
+      } else {
         showToast('Clipboard unavailable.', 'warning');
       }
     });
