@@ -55,6 +55,7 @@ const biometricInlinePassword = document.getElementById('biometricInlinePassword
 const biometricInlineCancel = document.getElementById('biometricInlineCancel');
 const biometricInlineConfirm = document.getElementById('biometricInlineConfirm');
 const exportVaultBtn = document.getElementById('exportVault');
+const biometricSetupBtn = document.getElementById('biometricSetupBtn');
 const importVaultBtn = document.getElementById('importVaultBtn');
 const importVaultFile = document.getElementById('importVaultFile');
 const clearVaultBtn = document.getElementById('clearVault');
@@ -201,16 +202,23 @@ export function renderVaultState() {
   if (vaultUnlockedPanel) vaultUnlockedPanel.classList.toggle('hidden', showLocked);
   if (createMasterSection) createMasterSection.classList.toggle('hidden', state.vaultInitialized !== false);
   if (unlockMasterSection) unlockMasterSection.classList.toggle('hidden', !state.vaultInitialized);
-  
-  if (!state.vaultUnlocked && state.vaultInitialized) {
+
+  if (state.vaultInitialized) {
     sendMessage('BIOMETRIC_STATUS').then(res => {
       if (res?.enabled) {
         biometricUnlockContainer?.classList.remove('hidden');
+        biometricUnlockBtn?.classList.remove('hidden');
       } else {
-        biometricUnlockContainer?.classList.add('hidden');
+        biometricUnlockContainer?.classList.remove('hidden');
+        biometricUnlockBtn?.classList.remove('hidden');
       }
     });
+  } else {
+    biometricUnlockContainer?.classList.add('hidden');
+    biometricUnlockBtn?.classList.add('hidden');
+  }
 
+  if (!state.vaultUnlocked && state.vaultInitialized) {
     if (vaultSearch) vaultSearch.value = '';
     if (searchContainer) searchContainer.classList.remove('active');
     state.filter = '';
@@ -220,6 +228,88 @@ export function renderVaultState() {
 
 function attachGlobalListeners() {
   viewTabs.forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
+
+  if (biometricUnlockBtn) {
+    biometricUnlockBtn.addEventListener('click', async () => {
+      if (!state.vaultInitialized) {
+        showToast('Initialize the vault first before enabling biometrics.', 'warning');
+        return;
+      }
+
+      const status = await sendMessage('BIOMETRIC_STATUS');
+      if (!status?.ok) {
+        showToast('Unable to check biometric availability.', 'warning');
+        return;
+      }
+
+      if (!status.enabled) {
+        showToast('Biometric unlock is not configured yet. Use your master password to unlock the vault first.', 'info');
+        return;
+      }
+
+      const passphrase = (biometricInlinePassword?.value || '').trim();
+      if (!passphrase) {
+        biometricInlineAuth?.classList.add('active');
+        biometricInlineAuth?.setAttribute('aria-hidden', 'false');
+        if (biometricInlinePassword) biometricInlinePassword.focus();
+        showToast('Enter your master password to continue.', 'warning');
+        return;
+      }
+
+      const timeoutMinutes = state.settings?.vaultTimeout || 15;
+      const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+      if (!response?.ok) {
+        showToast(response?.error || 'Unable to unlock vault.', 'error');
+        return;
+      }
+      state.passphrase = passphrase;
+      state.vaultUnlocked = true;
+      state.vaultInitialized = true;
+      state.entries = response.data?.entries || [];
+      renderVaultState();
+      renderEntries();
+      resetInactivityTimer();
+      biometricInlineAuth?.classList.remove('active');
+      biometricInlineAuth?.setAttribute('aria-hidden', 'true');
+      if (biometricInlinePassword) biometricInlinePassword.value = '';
+      showToast('Vault unlocked.', 'success');
+    });
+  }
+
+  if (biometricInlineCancel) {
+    biometricInlineCancel.addEventListener('click', () => {
+      biometricInlineAuth?.classList.remove('active');
+      biometricInlineAuth?.setAttribute('aria-hidden', 'true');
+      if (biometricInlinePassword) biometricInlinePassword.value = '';
+    });
+  }
+
+  if (biometricInlineConfirm) {
+    biometricInlineConfirm.addEventListener('click', async () => {
+      const passphrase = (biometricInlinePassword?.value || '').trim();
+      if (!passphrase) {
+        showToast('Enter your master password to continue.', 'warning');
+        return;
+      }
+      const timeoutMinutes = state.settings?.vaultTimeout || 15;
+      const response = await sendMessage('UNLOCK_VAULT', { passphrase, timeoutMinutes });
+      if (!response?.ok) {
+        showToast(response?.error || 'Unable to unlock vault.', 'error');
+        return;
+      }
+      state.passphrase = passphrase;
+      state.vaultUnlocked = true;
+      state.vaultInitialized = true;
+      state.entries = response.data?.entries || [];
+      renderVaultState();
+      renderEntries();
+      resetInactivityTimer();
+      biometricInlineAuth?.classList.remove('active');
+      biometricInlineAuth?.setAttribute('aria-hidden', 'true');
+      if (biometricInlinePassword) biometricInlinePassword.value = '';
+      showToast('Vault unlocked.', 'success');
+    });
+  }
 
   modalBackdrop.addEventListener('click', () => {
     closeModal('entryModal');
