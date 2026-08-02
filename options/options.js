@@ -1,4 +1,5 @@
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from '../src/settings.js';
+import { onStorageChanged } from '../src/storage.js';
 
 const form = document.getElementById('settingsForm');
 const statusEl = document.getElementById('status');
@@ -189,7 +190,7 @@ async function init() {
   vaultStatusInterval = setInterval(checkVaultStatus, 2000);
 
   // Listen for storage changes to sync UI
-  chrome.storage.onChanged.addListener((changes, area) => {
+  const removeListener = onStorageChanged((changes, area) => {
     if (area === 'sync' || area === 'local') {
       // Check if any settings keys changed
       const settingsKeys = Object.keys(DEFAULT_SETTINGS);

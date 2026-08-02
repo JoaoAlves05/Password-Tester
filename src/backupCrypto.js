@@ -1,3 +1,5 @@
+import { bufferToBase64, base64ToBuffer } from './encoding.js';
+
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 
@@ -5,18 +7,7 @@ const BACKUP_ENCRYPTED_KIND = 'securepass-encrypted-backup';
 const BACKUP_ENCRYPTED_VERSION = 1;
 const BACKUP_PBKDF2_ITERATIONS = 450000;
 
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
 
-function base64ToBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
 
 async function deriveBackupKey(password, saltBuffer, iterations = BACKUP_PBKDF2_ITERATIONS) {
   const keyMaterial = await crypto.subtle.importKey(

@@ -1,18 +1,17 @@
-import { getStorage, setStorage } from './storage.js';
+import { getStorage, setStorage, removeStorage } from './storage.js';
+import * as storageUtils from './utils/storage.js';
 import { loadSettings } from './settings.js';
 import { validateEntry, validateImportData } from './validation.js';
+import { bufferToBase64, base64ToBuffer } from './encoding.js';
+import { VAULT_KEY, META_KEY, CHUNK_SIZE, PRF_EVAL_LABEL, ALARM_NAME, SECUREPASS_DB_NAME } from './constants.js';
+import { logger } from './logger.js';
 
-const VAULT_KEY    = 'securepassVault';
-const META_KEY     = 'securepassMeta';
 const BIOMETRIC_KEY = 'securepassBiometric';
 const TRUSTED_DEVICE_KEY = 'securepassTrustedDeviceKey';
 const ITERATIONS   = 600000;
-const CHUNK_SIZE   = 7000;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const STORAGE_PREFERENCE = ['sync', 'local'];
-const ALARM_NAME = 'vaultAutoLock';
-const PRF_EVAL_LABEL = 'securepass-master-key-v1';
 
 let cache = { data: null };
 let unlockedPassphrase = null;
@@ -20,18 +19,7 @@ let unlockedPassphrase = null;
 let bruteForceAttempts = 0;
 let lockoutUntil = 0;
 
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
 
-function base64ToBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
 
 async function deriveKey(passphrase, salt, iterations = ITERATIONS) {
   const keyMaterial = await crypto.subtle.importKey(
@@ -81,61 +69,18 @@ async function decryptData(record, passphrase) {
 }
 
 async function getDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('SecurePassDB', 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('vault')) {
-        db.createObjectStore('vault');
-      }
-    };
-    request.onsuccess = (e) => resolve(e.target.result);
-    request.onerror = () => reject(request.error);
-  });
+  return storageUtils.getDB();
 }
 
 async function loadVaultRecord() {
   const settings = await loadSettings();
   if (settings.useSync) {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(null, items => {
-        if (chrome.runtime.lastError) return resolve(null);
-        if (items[`${VAULT_KEY}_manifest`]) {
-          try {
-            const manifest = items[`${VAULT_KEY}_manifest`];
-            let fullString = '';
-            for (let i = 0; i < manifest.chunks; i++) {
-              if (items[`${VAULT_KEY}_chunk_${i}`] === undefined) {
-                return resolve(null); // corrupted
-              }
-              fullString += items[`${VAULT_KEY}_chunk_${i}`];
-            }
-            resolve(JSON.parse(fullString));
-          } catch (e) {
-            resolve(null);
-          }
-        } else {
-          resolve(null);
-        }
-      });
-    });
+    return storageUtils.readSyncVaultRecordRaw();
   } else {
     try {
-      const db = await getDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction('vault', 'readonly');
-        tx.oncomplete = () => db.close();
-        tx.onerror = () => {
-          db.close();
-          reject(tx.error);
-        };
-        const store = tx.objectStore('vault');
-        const request = store.get(VAULT_KEY);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-      });
+      return await storageUtils.readLocalVaultRecordRaw();
     } catch (error) {
-      console.error('Failed to load vault from IndexedDB:', error);
+      logger.error('Failed to load vault from IndexedDB:', error?.message || String(error));
       return null;
     }
   }
@@ -144,59 +89,9 @@ async function loadVaultRecord() {
 async function saveVaultRecord(record) {
   const settings = await loadSettings();
   if (settings.useSync) {
-    return new Promise((resolve, reject) => {
-      chrome.storage.sync.get(`${VAULT_KEY}_manifest`, (items) => {
-        const oldManifest = items[`${VAULT_KEY}_manifest`];
-        const oldChunksCount = oldManifest ? oldManifest.chunks : 0;
-        
-        const serialized = JSON.stringify(record);
-        const chunkCount = Math.ceil(serialized.length / CHUNK_SIZE);
-        const payload = {
-          [`${VAULT_KEY}_manifest`]: { chunks: chunkCount, updatedAt: Date.now() }
-        };
-        
-        let chunkIdx = 0;
-        for (let i = 0; i < serialized.length; i += CHUNK_SIZE) {
-          payload[`${VAULT_KEY}_chunk_${chunkIdx}`] = serialized.substring(i, i + CHUNK_SIZE);
-          chunkIdx++;
-        }
-        
-        const keysToRemove = [];
-        for (let i = chunkIdx; i < oldChunksCount; i++) {
-           keysToRemove.push(`${VAULT_KEY}_chunk_${i}`);
-        }
-        
-        const doSet = () => {
-          chrome.storage.sync.set(payload, () => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            resolve();
-          });
-        };
-        
-        if (keysToRemove.length > 0) {
-          chrome.storage.sync.remove(keysToRemove, () => {
-             if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-             doSet();
-          });
-        } else {
-          doSet();
-        }
-      });
-    });
+    return storageUtils.writeSyncVaultRecordRaw(record);
   } else {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('vault', 'readwrite');
-      tx.oncomplete = () => db.close();
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-      const store = tx.objectStore('vault');
-      const request = store.put(record, VAULT_KEY);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    return storageUtils.writeLocalVaultRecordRaw(record);
   }
 }
 
@@ -208,7 +103,7 @@ async function updateActivity(timeoutMinutes) {
   // Update session storage
   try {
     // We only update timestamp
-    await chrome.storage.session.set({ 
+    await setStorage('session', { 
       vaultLastActivity: now,
       vaultTimeoutMinutes: timeoutMinutes 
     });
@@ -218,14 +113,14 @@ async function updateActivity(timeoutMinutes) {
     chrome.idle.setDetectionInterval(timeoutSeconds);
 
   } catch (e) {
-    console.error('Failed to configure idle detection:', e);
+    logger.error('Failed to configure idle detection:', e?.message || String(e));
   }
 
   // Backup alarm in case idle API is flaky or SW shuts down
   try {
     await chrome.alarms.create(ALARM_NAME, { delayInMinutes: timeoutMinutes });
   } catch (e) {
-    console.error('Failed to create alarm:', e);
+    logger.error('Failed to create alarm:', e?.message || String(e));
   }
 }
 
@@ -398,7 +293,7 @@ export async function lockVault() {
   unlockedPassphrase = null;
   
   try {
-    await chrome.storage.session.remove(['vaultLastActivity', 'vaultTimeoutMinutes']);
+    await removeStorage('session', ['vaultLastActivity', 'vaultTimeoutMinutes']);
     await chrome.alarms.clear(ALARM_NAME);
   } catch (e) {
     // Ignore
@@ -502,8 +397,8 @@ export async function listCredentials() {
     // We need to know the timeout.
     // We can get it from session or settings.
     try {
-       const session = await chrome.storage.session.get('vaultTimeoutMinutes');
-       const timeout = session.vaultTimeoutMinutes || 15;
+        const session = await getStorage('session', 'vaultTimeoutMinutes');
+        const timeout = session.vaultTimeoutMinutes || 15;
        await updateActivity(timeout);
     } catch(e) {}
   }
@@ -550,32 +445,32 @@ export async function keepAlive() {
 
 async function saveCredentialMeta(entry) {
   try {
-    const items = await chrome.storage.local.get(META_KEY);
+    const items = await getStorage('local', META_KEY);
     const meta = items[META_KEY] || [];
     const { id, username, site, createdAt, updatedAt } = entry;
     const record = { id, username: username || '', site: site || '', createdAt, updatedAt };
     const idx = meta.findIndex(m => m.id === id);
     if (idx >= 0) meta[idx] = record;
     else meta.push(record);
-    await chrome.storage.local.set({ [META_KEY]: meta });
+    await setStorage('local', { [META_KEY]: meta });
   } catch (e) {
-    console.warn('SecurePass: failed to save credential meta', e);
+    logger.warn('SecurePass: failed to save credential meta:', e?.message || String(e));
   }
 }
 
 async function removeCredentialMeta(id) {
   try {
-    const items = await chrome.storage.local.get(META_KEY);
+    const items = await getStorage('local', META_KEY);
     const meta = (items[META_KEY] || []).filter(m => m.id !== id);
-    await chrome.storage.local.set({ [META_KEY]: meta });
+    await setStorage('local', { [META_KEY]: meta });
   } catch (e) {
-    console.warn('SecurePass: failed to remove credential meta', e);
+    logger.warn('SecurePass: failed to remove credential meta:', e?.message || String(e));
   }
 }
 
 export async function listCredentialsMeta() {
   try {
-    const items = await chrome.storage.local.get(META_KEY);
+    const items = await getStorage('local', META_KEY);
     return items[META_KEY] || [];
   } catch {
     return [];
@@ -587,7 +482,7 @@ export async function listCredentialsMeta() {
 export async function syncMetadataFromEntries(entries) {
   if (!entries || !entries.length) return;
   try {
-    const items = await chrome.storage.local.get(META_KEY);
+    const items = await getStorage('local', META_KEY);
     const meta = items[META_KEY] || [];
     const existingIds = new Set(meta.map(m => m.id));
     let changed = false;
@@ -604,10 +499,10 @@ export async function syncMetadataFromEntries(entries) {
       }
     }
     if (changed) {
-      await chrome.storage.local.set({ [META_KEY]: meta });
+      await setStorage('local', { [META_KEY]: meta });
     }
   } catch (e) {
-    console.warn('SecurePass: failed to sync metadata', e);
+    logger.warn('SecurePass: failed to sync metadata:', e?.message || String(e));
   }
 }
 
@@ -616,7 +511,7 @@ export async function syncMetadataFromEntries(entries) {
 export function getPRFEvalLabel() { return PRF_EVAL_LABEL; }
 
 export async function getBiometricData() {
-  const items = await chrome.storage.local.get(BIOMETRIC_KEY);
+  const items = await getStorage('local', BIOMETRIC_KEY);
   return items[BIOMETRIC_KEY] || null;
 }
 
@@ -626,11 +521,11 @@ export async function isBiometricEnabled() {
 }
 
 export async function clearBiometricData() {
-  await chrome.storage.local.remove(BIOMETRIC_KEY);
+  await removeStorage('local', BIOMETRIC_KEY);
 }
 
 export async function saveBiometricSetup(credentialId, encryptedPassphrase, prfAvailable, mode = 'prf-unlock') {
-  await chrome.storage.local.set({
+  await setStorage('local', {
     [BIOMETRIC_KEY]: {
       enabled: true,
       credentialId,
@@ -643,13 +538,13 @@ export async function saveBiometricSetup(credentialId, encryptedPassphrase, prfA
 }
 
 async function getOrCreateTrustedDeviceKey() {
-  const existing = await chrome.storage.local.get(TRUSTED_DEVICE_KEY);
+  const existing = await getStorage('local', TRUSTED_DEVICE_KEY);
   if (existing?.[TRUSTED_DEVICE_KEY]) {
     return base64ToBuffer(existing[TRUSTED_DEVICE_KEY]);
   }
 
   const raw = crypto.getRandomValues(new Uint8Array(32));
-  await chrome.storage.local.set({ [TRUSTED_DEVICE_KEY]: bufferToBase64(raw.buffer) });
+  await setStorage('local', { [TRUSTED_DEVICE_KEY]: bufferToBase64(raw.buffer) });
   return raw.buffer;
 }
 
@@ -665,7 +560,7 @@ async function importTrustedDeviceAesKey() {
 }
 
 export async function clearTrustedDeviceKey() {
-  await chrome.storage.local.remove(TRUSTED_DEVICE_KEY);
+  await removeStorage('local', TRUSTED_DEVICE_KEY);
 }
 
 export async function encryptPassphraseWithTrustedDevice(passphrase) {

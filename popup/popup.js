@@ -1,15 +1,8 @@
 import { evaluatePassword } from '../src/passwordStrength.js';
 import { loadSettings, saveSettings } from '../src/settings.js';
-
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
-function base64ToBuffer(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
-}
+import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
+import { logger } from '../src/logger.js';
+import { getStorage, onStorageChanged } from '../src/storage.js';
 
 const ICONS = {
   sun:
@@ -1253,7 +1246,7 @@ function attachEventListeners() {
 
         // 3. Trigger native dialog directly from extension popup
         // Note: we can do this here because popup is extension origin
-        const bioDataRes = await chrome.storage.local.get('securepassBiometric');
+        const bioDataRes = await getStorage('local', 'securepassBiometric');
         const b = bioDataRes.securepassBiometric;
         if (!b) throw new Error('Stored biometric data not found.');
 
@@ -1314,7 +1307,7 @@ function attachEventListeners() {
           throw new Error(completeRes?.error || 'Authentication failed');
         }
       } catch (err) {
-        console.error('Biometric Unlock Error:', err);
+        logger.error('Biometric Unlock Error:', err?.message || String(err));
         if (err.name !== 'NotAllowedError') {
           showToast(err.message || 'Biometric authentication failed.', 'error');
         }
@@ -2010,7 +2003,7 @@ async function initialise() {
   setView('tester');
 
   // Listen for settings changes from Options page
-  chrome.storage.onChanged.addListener((changes, area) => {
+  const removeListener = onStorageChanged((changes, area) => {
     if (area === 'sync' || area === 'local') {
       loadSettings().then(settings => {
         state.settings = settings;

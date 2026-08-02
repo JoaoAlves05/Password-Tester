@@ -1,12 +1,5 @@
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
-function base64ToBuffer(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
-}
+import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
+import { getStorage } from '../src/storage.js';
 
 const params    = new URLSearchParams(location.search);
 const sessionId = params.get('sessionId');
@@ -14,7 +7,7 @@ const sessionId = params.get('sessionId');
 async function triggerWebAuthn() {
   try {
     const sessionKey = `biometric_${sessionId}`;
-    const stored = await chrome.storage.session.get(sessionKey);
+    const stored = await getStorage('session', sessionKey);
     const data = stored[sessionKey];
     if (!data) throw new Error('Invalid session');
 

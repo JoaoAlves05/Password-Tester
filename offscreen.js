@@ -50,6 +50,13 @@ async function clearClipboard() {
     }
     
   } catch (error) {
-    console.error('Failed to clear clipboard:', error);
+    // Use logger from shared module to keep logs consistent. Offscreen can't import modules directly
+    // in all extension environments; fallback to console for compatibility.
+    try {
+      const { logger } = await import('./src/logger.js');
+      logger.error('Failed to clear clipboard:', error?.message || String(error));
+    } catch {
+      console.error('SecurePass offscreen: Failed to clear clipboard', error?.message || String(error));
+    }
   }
 }

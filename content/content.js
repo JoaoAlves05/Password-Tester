@@ -1,15 +1,23 @@
 (async () => {
   const AUTO_SUBMIT_ENABLED = true;
 
-  function bufferToBase64(buffer) {
-    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-  }
+  // Default (local) implementations — used as fallback if dynamic import fails.
+  let bufferToBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
 
-  function base64ToBuffer(b64) {
+  let base64ToBuffer = (b64) => {
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
     return bytes.buffer;
+  };
+
+  // Try to use centralized encoding helpers from the extension if available.
+  try {
+    const enc = await import(chrome.runtime.getURL('src/encoding.js'));
+    if (enc?.bufferToBase64) bufferToBase64 = enc.bufferToBase64;
+    if (enc?.base64ToBuffer) base64ToBuffer = enc.base64ToBuffer;
+  } catch (e) {
+    // Keep local fallbacks.
   }
 
   async function runBiometricAssertion(credentialId, sessionId) {
@@ -573,9 +581,10 @@
   // ── Resolve theme ──
   async function resolveThemeClass() {
     try {
-      const syncInfo = await chrome.storage.local.get('settingsSync');
+      const storage = await import(chrome.runtime.getURL('src/storage.js'));
+      const syncInfo = await storage.getStorage('local', 'settingsSync');
       const area = syncInfo?.settingsSync?.useSync ? 'sync' : 'local';
-      const stored = await chrome.storage[area].get('settings');
+      const stored = await storage.getStorage(area, 'settings');
       const theme = stored?.settings?.theme || 'system';
       if (theme === 'dark') return 'sp-dark';
       if (theme === 'light') return 'sp-light';
@@ -595,7 +604,8 @@
     });
   }
 
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+  const storageModule = await import(chrome.runtime.getURL('src/storage.js'));
+  const removeStorageListener = storageModule.onStorageChanged((changes, areaName) => {
     if (areaName === 'local' && changes.settingsSync) updateAllThemes();
     if (changes.settings) updateAllThemes();
   });

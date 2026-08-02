@@ -28,31 +28,25 @@ import {
   overwriteVaultEntries,
 } from '../src/cryptoVault.js';
 import { createVaultBackup, validateString, validateEntry, validateConstraints, validateImportData } from '../src/validation.js';
-
-function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-}
-
-const VAULT_KEY = 'securepassVault';
-const META_KEY = 'securepassMeta';
-const SECUREPASS_DB_NAME = 'SecurePassDB';
-const CHUNK_SIZE = 7000;
-const BIOMETRIC_SESSION_PASSPHRASE_KEY = 'biometricSessionPassphrase';
+import { bufferToBase64, base64ToBuffer } from '../src/encoding.js';
+import { VAULT_KEY, META_KEY, CHUNK_SIZE, SECUREPASS_DB_NAME, BIOMETRIC_SESSION_PASSPHRASE_KEY, ALARM_NAME } from '../src/constants.js';
+import { logger } from '../src/logger.js';
+import * as storageUtils from '../src/utils/storage.js';
 
 const pendingSaves = new Map();
 
 async function setBiometricSessionPassphrase(passphrase) {
   if (!passphrase) return;
-  await chrome.storage.session.set({ [BIOMETRIC_SESSION_PASSPHRASE_KEY]: passphrase });
+  await storageUtils.setStorage('session', { [BIOMETRIC_SESSION_PASSPHRASE_KEY]: passphrase });
 }
 
 async function getBiometricSessionPassphrase() {
-  const result = await chrome.storage.session.get(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+  const result = await storageUtils.getStorage('session', BIOMETRIC_SESSION_PASSPHRASE_KEY);
   return result?.[BIOMETRIC_SESSION_PASSPHRASE_KEY] || '';
 }
 
 async function clearBiometricSessionPassphrase() {
-  await chrome.storage.session.remove(BIOMETRIC_SESSION_PASSPHRASE_KEY);
+  await storageUtils.removeStorage('session', BIOMETRIC_SESSION_PASSPHRASE_KEY);
 }
 
 function isExtensionPageSender(sender) {
@@ -60,12 +54,7 @@ function isExtensionPageSender(sender) {
 }
 
 async function deleteIndexedDb(name) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(name);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error || new Error(`Failed to delete ${name}`));
-    request.onblocked = () => reject(new Error(`Unable to delete ${name} because it is still open.`));
-  });
+  return storageUtils.deleteIndexedDb(name);
 }
 
 async function clearClipboardAlarmState() {
@@ -76,7 +65,7 @@ async function clearClipboardAlarmState() {
 
 async function clearVaultAutoLockAlarmState() {
   try {
-    await chrome.alarms.clear('vaultAutoLock');
+    await chrome.alarms.clear(ALARM_NAME);
   } catch {}
 }
 
@@ -85,9 +74,9 @@ async function clearAllUserData() {
   await clearBiometricSessionPassphrase();
   await clearTrustedDeviceKey();
   await Promise.allSettled([
-    chrome.storage.local.clear(),
-    chrome.storage.sync.clear(),
-    chrome.storage.session.clear(),
+    storageUtils.clearStorage('local'),
+    storageUtils.clearStorage('sync'),
+    storageUtils.clearStorage('session'),
     clearClipboardAlarmState(),
     clearVaultAutoLockAlarmState(),
     deleteIndexedDb(SECUREPASS_DB_NAME),
@@ -96,7 +85,7 @@ async function clearAllUserData() {
 
 async function clearVaultEntriesOnly() {
   await overwriteVaultEntries([]);
-  await chrome.storage.local.remove(META_KEY);
+  await storageUtils.removeStorage('local', META_KEY);
 }
 
 function recordsEqual(recordA, recordB) {
@@ -106,136 +95,23 @@ function recordsEqual(recordA, recordB) {
 }
 
 async function getDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('SecurePassDB', 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('vault')) {
-        db.createObjectStore('vault');
-      }
-    };
-    request.onsuccess = (e) => resolve(e.target.result);
-    request.onerror = () => reject(request.error);
-  });
+  return storageUtils.getDB();
 }
 
 async function readLocalVaultRecordRaw() {
-  try {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('vault', 'readonly');
-      tx.oncomplete = () => db.close();
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-      const store = tx.objectStore('vault');
-      const request = store.get(VAULT_KEY);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  } catch {
-    return null;
-  }
+  return storageUtils.readLocalVaultRecordRaw();
 }
 
 async function writeLocalVaultRecordRaw(record) {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('vault', 'readwrite');
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-    const store = tx.objectStore('vault');
-    const request = store.put(record, VAULT_KEY);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  return storageUtils.writeLocalVaultRecordRaw(record);
 }
 
 async function readSyncVaultRecordRaw() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(null, items => {
-      if (chrome.runtime.lastError) {
-        resolve(null);
-        return;
-      }
-      const manifest = items[`${VAULT_KEY}_manifest`];
-      if (!manifest || typeof manifest.chunks !== 'number' || manifest.chunks < 1) {
-        resolve(null);
-        return;
-      }
-
-      try {
-        let fullString = '';
-        for (let i = 0; i < manifest.chunks; i += 1) {
-          const chunk = items[`${VAULT_KEY}_chunk_${i}`];
-          if (chunk === undefined) {
-            resolve(null);
-            return;
-          }
-          fullString += chunk;
-        }
-        resolve(JSON.parse(fullString));
-      } catch {
-        resolve(null);
-      }
-    });
-  });
+  return storageUtils.readSyncVaultRecordRaw();
 }
 
 async function writeSyncVaultRecordRaw(record) {
-  return new Promise((resolve, reject) => {
-    chrome.storage.sync.get(`${VAULT_KEY}_manifest`, items => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-
-      const oldManifest = items[`${VAULT_KEY}_manifest`];
-      const oldChunksCount = oldManifest ? oldManifest.chunks : 0;
-      const serialized = JSON.stringify(record);
-      const chunkCount = Math.ceil(serialized.length / CHUNK_SIZE);
-      const payload = {
-        [`${VAULT_KEY}_manifest`]: { chunks: chunkCount, updatedAt: Date.now() }
-      };
-
-      let chunkIdx = 0;
-      for (let i = 0; i < serialized.length; i += CHUNK_SIZE) {
-        payload[`${VAULT_KEY}_chunk_${chunkIdx}`] = serialized.substring(i, i + CHUNK_SIZE);
-        chunkIdx += 1;
-      }
-
-      const keysToRemove = [];
-      for (let i = chunkIdx; i < oldChunksCount; i += 1) {
-        keysToRemove.push(`${VAULT_KEY}_chunk_${i}`);
-      }
-
-      const persist = () => {
-        chrome.storage.sync.set(payload, () => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          resolve();
-        });
-      };
-
-      if (keysToRemove.length) {
-        chrome.storage.sync.remove(keysToRemove, () => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          persist();
-        });
-      } else {
-        persist();
-      }
-    });
-  });
+  return storageUtils.writeSyncVaultRecordRaw(record);
 }
 
 async function analyzeSyncTransition(targetUseSync) {
@@ -687,7 +563,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const sessionId = crypto.randomUUID();
           const challenge = bufferToBase64(crypto.getRandomValues(new Uint8Array(32)).buffer);
 
-          await chrome.storage.session.set({
+          await storageUtils.setStorage('session', {
             [`biometric_${sessionId}`]: {
               challenge,
               credentialId: biometricData.credentialId,
@@ -706,7 +582,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Called by auth.html after successful authentication assertion
         const { sessionId, prfOutput, prfAvailable } = message;
         try {
-          const sRes = await chrome.storage.session.get(`biometric_${sessionId}`);
+          const sRes = await storageUtils.getStorage('session', `biometric_${sessionId}`);
           const sessionData = sRes[`biometric_${sessionId}`];
 
           if (!sessionData) { sendResponse({ ok: false, error: 'Session not found' }); break; }
@@ -777,7 +653,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           // Clean up session
-          await chrome.storage.session.remove(`biometric_${sessionId}`);
+          await storageUtils.removeStorage('session', `biometric_${sessionId}`);
           // Notify content script
           // Notify content script
           if (tabId) {
@@ -796,13 +672,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const sessionKey = `biometric_${sessionId}`;
         
         try {
-          const sRes = await chrome.storage.session.get(sessionKey);
+          const sRes = await storageUtils.getStorage('session', sessionKey);
           const sd = sRes[sessionKey];
           // Notify content script that auth was cancelled
           if (sd?.tabId) {
             try { chrome.tabs.sendMessage(sd.tabId, { type: 'BIOMETRIC_FILL_RESULT', sessionId, entry: null, error: error || 'Authentication cancelled.' }); } catch {}
           }
-          await chrome.storage.session.remove(sessionKey);
+          await storageUtils.removeStorage('session', sessionKey);
           sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: error.message });
@@ -856,9 +732,9 @@ chrome.notifications.onClosed.addListener((notifId) => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'clearClipboard') {
     await clearClipboardFromBackground();
-  } else if (alarm.name === 'vaultAutoLock') {
+  } else if (alarm.name === ALARM_NAME) {
     try {
-      const session = await chrome.storage.session.get('vaultTimeoutMinutes');
+      const session = await storageUtils.getStorage('session', 'vaultTimeoutMinutes');
       const timeoutSecs = Math.max(60, (session.vaultTimeoutMinutes || 15) * 60);
 
       chrome.idle.queryState(timeoutSecs, async (state) => {
@@ -883,7 +759,7 @@ async function clearClipboardFromBackground() {
       target: 'offscreen'
     });
   } catch (error) {
-    console.error('Failed to clear clipboard:', error);
+    logger.error('Failed to clear clipboard:', error?.message || String(error));
   }
 }
 

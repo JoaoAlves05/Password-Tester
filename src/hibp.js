@@ -1,4 +1,5 @@
 import { loadSettings } from './settings.js';
+import { getStorage, setStorage } from './storage.js';
 
 const API_URL = 'https://api.pwnedpasswords.com/range/';
 
@@ -13,17 +14,12 @@ async function sha1(message) {
 }
 
 async function getCache() {
-  return new Promise(resolve => {
-    chrome.storage.local.get(['hibpCache'], data => {
-      resolve(data.hibpCache || {});
-    });
-  });
+  const data = await getStorage('local', ['hibpCache']);
+  return data.hibpCache || {};
 }
 
 async function setCache(cache) {
-  return new Promise(resolve => {
-    chrome.storage.local.set({ hibpCache: cache }, resolve);
-  });
+  await setStorage('local', { hibpCache: cache });
 }
 
 async function getCacheTtl() {
