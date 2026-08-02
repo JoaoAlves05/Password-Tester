@@ -1,6 +1,6 @@
 import { sendMessage } from './messaging.js';
 import { showToast } from './toast.js';
-import { state, resetInactivityTimer, renderVaultState, renderVaultEntries, setView, openModal, closeModal, sanitizeValue, detectActiveOrigin, ICONS } from '../popup.js';
+import { state, resetInactivityTimer, renderVaultState, setView, openModal, closeModal, sanitizeValue, detectActiveOrigin, ICONS } from '../popup.js';
 import { copyToClipboard } from '../../src/utils/clipboard.js';
 
 const vaultList = document.getElementById('vaultList');
