@@ -37,25 +37,25 @@ export const state = {
 };
 
 // DOM Elements
-const viewTabs = document.querySelectorAll('.tab');
+const viewTabs = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
 const modalBackdrop = document.getElementById('modalBackdrop');
 const settingsPanel = document.getElementById('settingsPanel');
 const openSettingsBtn = document.getElementById('openSettings');
 const closeSettingsBtn = document.getElementById('closeSettings');
 const addEntryBtn = document.getElementById('addEntry');
-const changeMasterBtn = document.getElementById('changeMasterBtn');
+const changeMasterBtn = document.getElementById('changeMasterKeyBtn');
 const lockVaultBtn = document.getElementById('lockVault');
 const vaultSearch = document.getElementById('vaultSearch');
 const searchToggle = document.getElementById('searchToggle');
-const searchContainer = document.getElementById('searchContainer');
+const searchContainer = document.querySelector('.search-container');
 const biometricUnlockBtn = document.getElementById('biometricUnlockBtn');
 const biometricInlineAuth = document.getElementById('biometricInlineAuth');
 const biometricInlinePassword = document.getElementById('biometricInlinePassword');
 const biometricInlineCancel = document.getElementById('biometricInlineCancel');
 const biometricInlineConfirm = document.getElementById('biometricInlineConfirm');
 const exportVaultBtn = document.getElementById('exportVault');
-const importVaultBtn = document.getElementById('importVault');
+const importVaultBtn = document.getElementById('importVaultBtn');
 const importVaultFile = document.getElementById('importVaultFile');
 const clearVaultBtn = document.getElementById('clearVault');
 const unlockSetupModal = document.getElementById('unlockSetupModal');
@@ -63,10 +63,10 @@ const unlockSetupForm = document.getElementById('unlockSetupForm');
 const unlockSetupPassword = document.getElementById('unlockSetupPassword');
 const entryModal = document.getElementById('entryModal');
 const masterModal = document.getElementById('masterModal');
-const vaultLockedPanel = document.getElementById('vaultLockedPanel');
-const vaultUnlockedPanel = document.getElementById('vaultUnlockedPanel');
-const createMasterSection = document.getElementById('createMasterSection');
-const unlockMasterSection = document.getElementById('unlockMasterSection');
+const vaultLockedPanel = document.getElementById('vaultLocked');
+const vaultUnlockedPanel = document.getElementById('vaultUnlocked');
+const createMasterSection = document.getElementById('createMaster');
+const unlockMasterSection = document.getElementById('unlockMaster');
 const biometricUnlockContainer = document.getElementById('biometricUnlockContainer');
 
 initToast(document.getElementById('toast'));
@@ -90,8 +90,8 @@ export function resetInactivityTimer() {
 export function setView(viewId) {
   views.forEach(v => v.classList.remove('active'));
   viewTabs.forEach(t => t.classList.remove('active'));
-  const targetView = document.getElementById(`${viewId}View`);
-  const targetTab = document.querySelector(`.tab[data-view="${viewId}"]`);
+  const targetView = document.getElementById(`view-${viewId}`);
+  const targetTab = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   if (targetView) targetView.classList.add('active');
   if (targetTab) targetTab.classList.add('active');
   if (viewId === 'tester' && state.generatorPassword) {
@@ -106,6 +106,7 @@ export function openSettingsPanel() {
 }
 
 export function closeSettingsPanel() {
+  document.activeElement?.blur();
   settingsPanel.classList.remove('visible');
   settingsPanel.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';

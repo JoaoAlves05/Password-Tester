@@ -4,14 +4,14 @@ import { state, resetInactivityTimer, renderVaultState, setView, openModal, clos
 import { copyToClipboard } from '../../src/utils/clipboard.js';
 
 const vaultList = document.getElementById('vaultList');
-const vaultEmptyPanel = document.getElementById('vaultEmptyPanel');
-const vaultLockedPanel = document.getElementById('vaultLockedPanel');
-const vaultUnlockedPanel = document.getElementById('vaultUnlockedPanel');
-const createMasterSection = document.getElementById('createMasterSection');
-const unlockMasterSection = document.getElementById('unlockMasterSection');
+const vaultEmptyPanel = document.getElementById('vaultEmpty');
+const vaultLockedPanel = document.getElementById('vaultLocked');
+const vaultUnlockedPanel = document.getElementById('vaultUnlocked');
+const createMasterSection = document.getElementById('createMaster');
+const unlockMasterSection = document.getElementById('unlockMaster');
 const biometricUnlockContainer = document.getElementById('biometricUnlockContainer');
 const vaultSearch = document.getElementById('vaultSearch');
-const searchContainer = document.getElementById('searchContainer');
+const searchContainer = document.querySelector('.search-container');
 const entryForm = document.getElementById('entryForm');
 const entrySiteInput = document.getElementById('entrySite');
 const entryUsernameInput = document.getElementById('entryUsername');
